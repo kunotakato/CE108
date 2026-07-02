@@ -48,6 +48,13 @@
 - 「テスター希望」の保存
 - LIFF接続用HTML雛形
 
+### Mobile Alpha v0.3.5
+- 学生向けNext.jsモバイル画面
+- ログイン、オンボーディング、ホーム、今日の5問、回答後解説、完了結果、理解度画面
+- PWA manifest
+- 320px幅を含むスマートフォン表示の横スクロール抑制
+- 回答前の正解情報露出ガード
+
 ## 重要事項
 
 収録されている問題は、動作確認用のCE108オリジナルサンプルです。30問診断はこのサンプル問題群から重複なく生成します。国家試験過去問の原文は収録していません。
@@ -121,6 +128,8 @@ GET  /api/questions
 GET  /api/questions/{qid}
 POST /api/questions/{qid}/answer
 GET  /api/study/today
+GET  /api/study/summary
+GET  /api/study/mastery
 POST /api/diagnostics/start
 POST /api/diagnostics/{sid}/answer
 GET  /api/diagnostics/{sid}/result
@@ -133,6 +142,35 @@ POST /api/admin/questions/{qid}/unpublish
 ```
 
 学生向けの問題詳細APIは、回答前に正答コード、数値正答、選択肢ごとの正誤を返しません。
+
+## Mobile Alpha v0.3.5
+
+学生がスマートフォンで毎日5問を解くためのNext.jsフロントエンドを`mobile/`に追加しています。教員・管理者画面は従来どおりStreamlitを利用します。
+
+FastAPIを起動した状態で、別ターミナルから起動します。
+
+```bash
+cd mobile
+npm install
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 npm run dev -- --hostname 127.0.0.1 --port 3000
+```
+
+通常は次のURLで開きます。
+
+```text
+http://127.0.0.1:3000/login
+```
+
+モバイル側の検証:
+
+```bash
+cd mobile
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm run test:e2e
+```
 
 ## CSV問題登録
 
@@ -187,6 +225,7 @@ ce108_v0_3/
 │   └── services.py
 ├── data/
 ├── liff/index.html
+├── mobile/
 ├── scripts/init_db.py
 ├── tests/test_core.py
 ├── Dockerfile

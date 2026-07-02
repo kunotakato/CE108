@@ -1,0 +1,103 @@
+import type {
+  AnswerPayload,
+  AnswerResult,
+  DailyPlan,
+  LearningSummary,
+  LoginResponse,
+  MasteryRow,
+  Question
+} from "./types";
+
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
+type ApiOptions = {
+  token?: string | null;
+  method?: string;
+  body?: unknown;
+  form?: URLSearchParams;
+};
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number
+  ) {
+    super(message);
+  }
+}
+
+async function parseError(response: Response) {
+  const text = await response.text();
+  try {
+    const json = JSON.parse(text) as { detail?: string };
+    return json.detail || text || "通信に失敗しました。";
+  } catch {
+    return text || "通信に失敗しました。";
+  }
+}
+
+export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
+  const headers = new Headers();
+  if (options.token) headers.set("Authorization", `Bearer ${options.token}`);
+  let body: BodyInit | undefined;
+  if (options.form) {
+    body = options.form;
+    headers.set("Content-Type", "application/x-www-form-urlencoded");
+  } else if (options.body !== undefined) {
+    body = JSON.stringify(options.body);
+    headers.set("Content-Type", "application/json");
+  }
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: options.method || "GET",
+    headers,
+    body
+  });
+  if (!response.ok) {
+    throw new ApiError(await parseError(response), response.status);
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function login(username: string, password: string) {
+  const form = new URLSearchParams({ username, password });
+  return apiFetch<LoginResponse>("/api/auth/login", { method: "POST", form });
+}
+
+export async function getToday(token: string) {
+  return apiFetch<DailyPlan>("/api/study/today", { token });
+}
+
+export async function getSummary(token: string) {
+  return apiFetch<LearningSummary>("/api/study/summary", { token });
+}
+
+export async function getMastery(token: string, limit = 3) {
+  return apiFetch<MasteryRow[]>(`/api/study/mastery?limit=${limit}`, { token });
+}
+
+export function assertQuestionSafe(question: Record<string, unknown>) {
+  const forbidden = ["correct_codes", "is_correct", "numeric_answer", "explanation_short", "explanation_standard", "explanation_detailed"];
+  for (const key of forbidden) {
+    if (key in question) {
+      throw new ApiError("回答前に正解情報を取得しました。画面表示を停止します。", 500);
+    }
+  }
+  const choices = Array.isArray(question.choices) ? question.choices : [];
+  if (choices.some((choice) => choice && typeof choice === "object" && ("is_correct" in choice || "explanation" in choice))) {
+    throw new ApiError("回答前に選択肢の解説情報を取得しました。画面表示を停止します。", 500);
+  }
+}
+
+export async function getQuestion(token: string, id: number) {
+  const question = await apiFetch<Question>(`/api/questions/${id}`, { token });
+  assertQuestionSafe(question as unknown as Record<string, unknown>);
+  return question;
+}
+
+export async function submitAnswer(token: string, questionId: number, payload: AnswerPayload) {
+  return apiFetch<AnswerResult>(`/api/questions/${questionId}/answer`, {
+    token,
+    method: "POST",
+    body: payload
+  });
+}

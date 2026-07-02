@@ -20,6 +20,8 @@ from ce108.services import (
     generate_daily_plan,
     get_diagnostic_state,
     get_question,
+    get_learning_summary,
+    get_mastery_report,
     get_student_summary_for_teacher,
     get_user,
     list_assignment_results,
@@ -35,8 +37,15 @@ async def lifespan(app: FastAPI):
     seed_database()
     yield
 
+LOCAL_ORIGINS = [
+    'http://localhost:8501',
+    'http://127.0.0.1:8501',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
+
 app = FastAPI(title='CE108 API', version='0.3.0', lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=['http://localhost:8501', 'http://127.0.0.1:8501'], allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
+app.add_middleware(CORSMiddleware, allow_origins=LOCAL_ORIGINS, allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
 oauth = OAuth2PasswordBearer(tokenUrl='/api/auth/login')
 
 class AnswerRequest(BaseModel):
@@ -130,6 +139,15 @@ def answer(qid: int, req: AnswerRequest, user=Depends(require_role('student'))):
 @app.get('/api/study/today')
 def today(user=Depends(require_role('student'))):
     return generate_daily_plan(user['id'])
+
+@app.get('/api/study/summary')
+def study_summary(user=Depends(require_role('student'))):
+    return get_learning_summary(user['id'])
+
+@app.get('/api/study/mastery')
+def study_mastery(limit: int = 3, user=Depends(require_role('student'))):
+    rows = get_mastery_report(user['id'])
+    return rows[:max(1, min(limit, 10))]
 
 @app.post('/api/diagnostics/start')
 def diag_start(user=Depends(require_role('student'))):

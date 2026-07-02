@@ -141,6 +141,19 @@ class TestApi(unittest.TestCase):
         self.assertNotIn('explanation_standard', text)
         self.assertNotIn('explanation_detailed', text)
 
+    def test_study_summary_api(self):
+        token = self._token()
+        res = self.client.get('/api/study/summary', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('accuracy', res.json())
+        self.assertIn('due_reviews', res.json())
+
+    def test_study_mastery_api(self):
+        token = self._token()
+        res = self.client.get('/api/study/mastery?limit=3', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(res.status_code, 200)
+        self.assertLessEqual(len(res.json()), 3)
+
 
 if __name__ == '__main__':
     unittest.main()
