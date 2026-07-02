@@ -83,6 +83,16 @@ Results:
 
 v0.4 implementation is acceptable for local beta verification.
 
+Release tag:
+
+- `v0.4.0-daily-learning-beta`
+
+Git state at release:
+
+- Branch: `feature/v0.4-daily-learning-beta`
+- Commit: `747141c Implement CE108 v0.4 daily learning beta`
+- Tag created and pushed: yes
+
 ## Remaining Limitations
 
 - LINE production connection is still out of scope.
@@ -93,12 +103,10 @@ v0.4 implementation is acceptable for local beta verification.
 - Streak and weekly completion are derived from answer history.
 - Review completion is inferred from later answer history rather than a dedicated review completion table.
 
-## Next Recommended Step
+## Final Recommended Step
 
-Run local manual smoke checks for:
+Open a GitHub pull request from:
 
-- Demo student mobile home and review queue.
-- Demo teacher dashboard.
-- Demo admin dashboard.
+- `feature/v0.4-daily-learning-beta`
 
-Then commit v0.4 changes and push the branch.
+After review, merge according to the repository's branch policy.
