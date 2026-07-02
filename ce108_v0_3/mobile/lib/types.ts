@@ -89,6 +89,41 @@ export type LearningSummary = {
   due_reviews: number;
 };
 
+export type DailyStatus = {
+  date: string;
+  status: "not_started" | "in_progress" | "completed";
+  completed_count: number;
+  total_count: number;
+  estimated_minutes: number;
+  streak_days: number;
+  weekly: Array<{ date: string; completed: boolean }>;
+  due_reviews: number;
+  tomorrow_preview: { review_count: number; message: string };
+  next_action: string;
+};
+
+export type ReviewItem = {
+  review_id: number;
+  scheduled_date: string;
+  priority: number;
+  status: string;
+  question_id: number;
+  question_text: string;
+  question_type: QuestionType;
+  subject_name: string;
+  topic_name: string;
+  completed: number;
+  review_label: "今日" | "期限超過" | "今後" | "完了";
+  reason: string;
+};
+
+export type ReviewQueue = {
+  date: string;
+  items: ReviewItem[];
+  due_count: number;
+  upcoming_count: number;
+};
+
 export type MasteryRow = {
   subject_name: string;
   topic_name: string;

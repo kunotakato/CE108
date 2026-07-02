@@ -413,6 +413,31 @@ h3 {
   padding: 6px 10px;
 }
 
+.week-row {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.day-dot {
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  height: 42px;
+  justify-content: center;
+}
+
+.day-dot.done {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
 .mastery-bar {
   background: var(--line);
   border-radius: 999px;

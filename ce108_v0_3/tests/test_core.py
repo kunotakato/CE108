@@ -15,10 +15,14 @@ from ce108.services import (
     authenticate_user,
     check_answer,
     generate_daily_plan,
+    get_admin_quality_summary,
+    get_daily_status,
     get_diagnostic_state,
     get_mastery_report,
     get_question,
+    get_review_queue,
     get_student_summary_for_teacher,
+    get_teacher_support_summary,
     record_answer,
     schedule_review,
     start_diagnostic,
@@ -85,6 +89,24 @@ class TestCore(unittest.TestCase):
         plan = generate_daily_plan(self.student['id'], count=5, db_path=self.db)
         self.assertEqual(len(plan['items']), 5)
 
+    def test_daily_status_tracks_completion_and_streak(self):
+        plan = generate_daily_plan(self.student['id'], count=5, db_path=self.db)
+        q = get_question(plan['items'][0]['question_id'], self.db)
+        record_answer(self.student['id'], q['id'], q['correct_codes'], q.get('numeric_answer'), 'たぶん分かる', 20, 'daily', db_path=self.db)
+        status = get_daily_status(self.student['id'], self.db)
+        self.assertEqual(status['completed_count'], 1)
+        self.assertEqual(status['status'], 'in_progress')
+        self.assertGreaterEqual(status['streak_days'], 1)
+        self.assertEqual(len(status['weekly']), 7)
+
+    def test_review_queue_labels_due_items(self):
+        q = get_question(1, self.db)
+        with connect(self.db) as conn:
+            conn.execute("INSERT OR IGNORE INTO review_schedules(user_id,question_id,review_type,scheduled_date,priority,status,created_at) VALUES(?,?, 'same_or_similar',?,3,'pending','2026-01-01T00:00:00+00:00')", (self.student['id'], q['id'], date.today().isoformat()))
+        queue = get_review_queue(self.student['id'], db_path=self.db)
+        self.assertGreaterEqual(queue['due_count'], 1)
+        self.assertIn(queue['items'][0]['review_label'], {'今日', '期限超過'})
+
     def test_unconfirmed_question_cannot_be_published(self):
         with self.assertRaises(ValueError):
             create_question(self.admin['id'], 'single', '権利未確認の問題', 'MED-ANAT', ['A', 'B'], ['1'], None, None, '短', '標準', '詳細', 3, 2, 'checking', 'published', self.db)
@@ -101,6 +123,17 @@ class TestCore(unittest.TestCase):
         qid = create_question(self.admin['id'], 'single', '承認前問題', 'MED-ANAT', ['A', 'B'], ['1'], None, None, '短', '標準', '詳細', 3, 2, 'checking', 'draft', self.db)
         with self.assertRaises(ValueError):
             approve_question(qid, self.admin['id'], self.db)
+
+    def test_teacher_support_summary_contains_risk(self):
+        rows = get_teacher_support_summary(self.teacher['id'], self.db)
+        self.assertTrue(rows)
+        self.assertIn(rows[0]['risk_level'], {'low', 'medium', 'high'})
+        self.assertIn('weak_topics', rows[0])
+
+    def test_admin_quality_summary_flags_questions(self):
+        summary = get_admin_quality_summary(self.db)
+        self.assertGreater(summary['counts']['ready'], 0)
+        self.assertTrue(summary['items'])
 
 
 class TestApi(unittest.TestCase):
@@ -153,6 +186,30 @@ class TestApi(unittest.TestCase):
         res = self.client.get('/api/study/mastery?limit=3', headers={'Authorization': f'Bearer {token}'})
         self.assertEqual(res.status_code, 200)
         self.assertLessEqual(len(res.json()), 3)
+
+    def test_daily_status_api(self):
+        token = self._token()
+        res = self.client.get('/api/study/daily-status', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('streak_days', res.json())
+        self.assertIn('next_action', res.json())
+
+    def test_review_queue_api(self):
+        token = self._token()
+        res = self.client.get('/api/study/reviews', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('items', res.json())
+
+    def test_teacher_support_api(self):
+        token = self._token('teacher@ce108.local')
+        res = self.client.get('/api/teacher/support', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(isinstance(res.json(), list))
+
+    def test_admin_quality_api_forbidden_to_student(self):
+        token = self._token()
+        res = self.client.get('/api/admin/quality', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(res.status_code, 403)
 
 
 if __name__ == '__main__':

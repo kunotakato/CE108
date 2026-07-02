@@ -28,10 +28,59 @@ async function mockApi(page: import("@playwright/test").Page) {
   await page.route("**/api/study/today", async (route) => {
     await route.fulfill({ json: { id: 1, plan_date: "2026-07-01", recommended_count: 5, estimated_minutes: 8, status: "not_started", items: planItems } });
   });
+  await page.route("**/api/study/daily-status**", async (route) => {
+    await route.fulfill({
+      json: {
+        date: "2026-07-01",
+        status: "not_started",
+        completed_count: 0,
+        total_count: 5,
+        estimated_minutes: 8,
+        streak_days: 3,
+        weekly: [
+          { date: "2026-06-25", completed: false },
+          { date: "2026-06-26", completed: true },
+          { date: "2026-06-27", completed: true },
+          { date: "2026-06-28", completed: false },
+          { date: "2026-06-29", completed: true },
+          { date: "2026-06-30", completed: true },
+          { date: "2026-07-01", completed: true }
+        ],
+        due_reviews: 0,
+        tomorrow_preview: { review_count: 1, message: "明日は復習から始めましょう。" },
+        next_action: "今日の5問を始める"
+      }
+    });
+  });
+  await page.route("**/api/study/reviews**", async (route) => {
+    await route.fulfill({
+      json: {
+        date: "2026-07-01",
+        due_count: 1,
+        upcoming_count: 1,
+        items: [
+          {
+            review_id: 1,
+            scheduled_date: "2026-07-01",
+            priority: 5,
+            status: "pending",
+            question_id: 1,
+            question_text: "復習テスト問題",
+            question_type: "single",
+            subject_name: "基礎医学",
+            topic_name: "解剖",
+            completed: 0,
+            review_label: "今日",
+            reason: "復習期限が到来しています"
+          }
+        ]
+      }
+    });
+  });
   await page.route("**/api/study/summary", async (route) => {
     await route.fulfill({ json: { total: 10, correct: 7, accuracy: 70, avg_seconds: 32, due_reviews: 2 } });
   });
-  await page.route("**/api/study/mastery?limit=3", async (route) => {
+  await page.route("**/api/study/mastery**", async (route) => {
     await route.fulfill({ json: [{ subject_name: "基礎医学", topic_name: "解剖", mastery_score: 35, retention_score: 40, total_answers: 2, correct_answers: 1 }] });
   });
   await page.route("**/api/questions/**", async (route) => {
@@ -64,6 +113,7 @@ test("login to five-question completion", async ({ page }) => {
   await page.goto("/login");
   await page.getByRole("button", { name: "ログイン" }).click();
   await page.getByRole("button", { name: "ホームへ進む" }).click();
+  await expect(page.getByText("3日")).toBeVisible();
   await page.getByRole("link", { name: "今日の5問を始める" }).click();
   await page.waitForURL("**/study");
 
@@ -101,4 +151,14 @@ test("shows retry UI when api fails", async ({ page }) => {
   await page.goto("/login");
   await page.getByRole("button", { name: "ログイン" }).click();
   await expect(page.locator(".state-view.error")).toContainText("メールアドレスまたはパスワードが違います。");
+});
+
+test("opens review queue", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/login");
+  await page.getByRole("button", { name: "ログイン" }).click();
+  await page.getByRole("button", { name: "ホームへ進む" }).click();
+  await page.getByRole("link", { name: "復習" }).click();
+  await expect(page.getByRole("heading", { name: "今日の復習を片づけましょう。" })).toBeVisible();
+  await expect(page.getByText("復習テスト問題")).toBeVisible();
 });

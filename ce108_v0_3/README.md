@@ -1,6 +1,6 @@
-# CE108 v0.3 実動MVP
+# CE108 v0.4 Daily Learning Beta
 
-臨床工学技士国家試験対策のローカル実動プロトタイプです。
+臨床工学技士国家試験対策のローカル実動プロトタイプです。v0.4では、学生が毎日使い続けるための日次学習体験、復習キュー、教員支援、管理者品質チェックを追加しています。
 
 ## 実装済み
 
@@ -54,6 +54,16 @@
 - PWA manifest
 - 320px幅を含むスマートフォン表示の横スクロール抑制
 - 回答前の正解情報露出ガード
+
+### Daily Learning Beta v0.4
+- 今日の学習状態
+- 連続学習日数
+- 7日間の学習サマリー
+- 未完了日次セッションの再開導線
+- 復習キュー
+- 復習予定の「今日・期限超過・今後」表示
+- 教員向け要注意学生サマリーAPI
+- 管理者向け問題品質チェックAPI
 
 ## 重要事項
 
@@ -128,14 +138,18 @@ GET  /api/questions
 GET  /api/questions/{qid}
 POST /api/questions/{qid}/answer
 GET  /api/study/today
+GET  /api/study/daily-status
+GET  /api/study/reviews
 GET  /api/study/summary
 GET  /api/study/mastery
 POST /api/diagnostics/start
 POST /api/diagnostics/{sid}/answer
 GET  /api/diagnostics/{sid}/result
 GET  /api/teacher/students
+GET  /api/teacher/support
 GET  /api/teacher/assignments/{assignment_id}/results.csv
 GET  /api/admin/questions
+GET  /api/admin/quality
 POST /api/admin/questions
 POST /api/admin/questions/{qid}/approve
 POST /api/admin/questions/{qid}/unpublish

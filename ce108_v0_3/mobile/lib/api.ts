@@ -1,11 +1,13 @@
 import type {
   AnswerPayload,
   AnswerResult,
+  DailyStatus,
   DailyPlan,
   LearningSummary,
   LoginResponse,
   MasteryRow,
-  Question
+  Question,
+  ReviewQueue
 } from "./types";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -65,6 +67,14 @@ export async function login(username: string, password: string) {
 
 export async function getToday(token: string) {
   return apiFetch<DailyPlan>("/api/study/today", { token });
+}
+
+export async function getDailyStatus(token: string) {
+  return apiFetch<DailyStatus>("/api/study/daily-status", { token });
+}
+
+export async function getReviewQueue(token: string, limit = 20) {
+  return apiFetch<ReviewQueue>(`/api/study/reviews?limit=${limit}`, { token });
 }
 
 export async function getSummary(token: string) {
