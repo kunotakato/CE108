@@ -1,6 +1,6 @@
-# CE108 v0.3 実動MVP
+# CE108 v0.4 Daily Learning Beta
 
-臨床工学技士国家試験対策のローカル実動プロトタイプです。
+臨床工学技士国家試験対策のローカル実動プロトタイプです。v0.4では、学生が毎日使い続けるための日次学習体験、復習キュー、教員支援、管理者品質チェックを追加しています。
 
 ## 実装済み
 
@@ -47,6 +47,23 @@
 - LINE Webhook受信口
 - 「テスター希望」の保存
 - LIFF接続用HTML雛形
+
+### Mobile Alpha v0.3.5
+- 学生向けNext.jsモバイル画面
+- ログイン、オンボーディング、ホーム、今日の5問、回答後解説、完了結果、理解度画面
+- PWA manifest
+- 320px幅を含むスマートフォン表示の横スクロール抑制
+- 回答前の正解情報露出ガード
+
+### Daily Learning Beta v0.4
+- 今日の学習状態
+- 連続学習日数
+- 7日間の学習サマリー
+- 未完了日次セッションの再開導線
+- 復習キュー
+- 復習予定の「今日・期限超過・今後」表示
+- 教員向け要注意学生サマリーAPI
+- 管理者向け問題品質チェックAPI
 
 ## 重要事項
 
@@ -121,18 +138,53 @@ GET  /api/questions
 GET  /api/questions/{qid}
 POST /api/questions/{qid}/answer
 GET  /api/study/today
+GET  /api/study/daily-status
+GET  /api/study/reviews
+GET  /api/study/summary
+GET  /api/study/mastery
 POST /api/diagnostics/start
 POST /api/diagnostics/{sid}/answer
 GET  /api/diagnostics/{sid}/result
 GET  /api/teacher/students
+GET  /api/teacher/support
 GET  /api/teacher/assignments/{assignment_id}/results.csv
 GET  /api/admin/questions
+GET  /api/admin/quality
 POST /api/admin/questions
 POST /api/admin/questions/{qid}/approve
 POST /api/admin/questions/{qid}/unpublish
 ```
 
 学生向けの問題詳細APIは、回答前に正答コード、数値正答、選択肢ごとの正誤を返しません。
+
+## Mobile Alpha v0.3.5
+
+学生がスマートフォンで毎日5問を解くためのNext.jsフロントエンドを`mobile/`に追加しています。教員・管理者画面は従来どおりStreamlitを利用します。
+
+FastAPIを起動した状態で、別ターミナルから起動します。
+
+```bash
+cd mobile
+npm install
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 npm run dev -- --hostname 127.0.0.1 --port 3000
+```
+
+通常は次のURLで開きます。
+
+```text
+http://127.0.0.1:3000/login
+```
+
+モバイル側の検証:
+
+```bash
+cd mobile
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm run test:e2e
+```
 
 ## CSV問題登録
 
@@ -187,6 +239,7 @@ ce108_v0_3/
 │   └── services.py
 ├── data/
 ├── liff/index.html
+├── mobile/
 ├── scripts/init_db.py
 ├── tests/test_core.py
 ├── Dockerfile

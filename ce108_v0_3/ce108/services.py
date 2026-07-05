@@ -1,6 +1,6 @@
 from __future__ import annotations
 import csv, io, json, math
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from .config import DB_PATH
@@ -105,6 +105,60 @@ def get_learning_summary(user_id:int,db_path:Path|str=DB_PATH):
 
 def list_due_reviews(user_id:int,db_path:Path|str=DB_PATH):
     return [dict(r) for r in fetch_all('''SELECT r.scheduled_date,r.priority,q.id question_id,q.question_text,s.name subject_name,t.name topic_name FROM review_schedules r JOIN questions q ON q.id=r.question_id LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary' LEFT JOIN topics t ON t.id=m.topic_id LEFT JOIN subjects s ON s.id=t.subject_id WHERE r.user_id=? AND r.status='pending' ORDER BY r.scheduled_date,r.priority DESC''',(user_id,),db_path)]
+
+def _iso_date(value:str)->date:
+    return datetime.fromisoformat(value.replace('Z','+00:00')).date()
+
+def _answer_dates(user_id:int,db_path:Path|str=DB_PATH)->list[date]:
+    rows=fetch_all("SELECT DISTINCT date(answered_at) d FROM answer_history WHERE user_id=? ORDER BY d DESC",(user_id,),db_path)
+    return [_iso_date(r['d']) for r in rows if r['d']]
+
+def _streak(dates:list[date],today:date)->int:
+    done=set(dates);cur=today;count=0
+    while cur in done:
+        count+=1;cur-=timedelta(days=1)
+    return count
+
+def get_daily_status(user_id:int,db_path:Path|str=DB_PATH):
+    today=date.today();plan=generate_daily_plan(user_id,db_path=db_path);items=plan.get('items',[]) if plan else []
+    completed=sum(1 for i in items if i.get('completed'));total=len(items);dates=_answer_dates(user_id,db_path)
+    week_start=today-timedelta(days=6);week=[{'date':(week_start+timedelta(days=i)).isoformat(),'completed':(week_start+timedelta(days=i)) in set(dates)} for i in range(7)]
+    due=fetch_one("SELECT COUNT(*) due FROM review_schedules WHERE user_id=? AND status='pending' AND scheduled_date<=?",(user_id,today.isoformat()),db_path)
+    tomorrow_count=fetch_one("SELECT COUNT(*) n FROM review_schedules WHERE user_id=? AND status='pending' AND scheduled_date=?",(user_id,(today+timedelta(days=1)).isoformat()),db_path)
+    status='completed' if total and completed>=total else ('in_progress' if completed else 'not_started')
+    return {'date':today.isoformat(),'status':status,'completed_count':completed,'total_count':total,'estimated_minutes':plan.get('estimated_minutes',0) if plan else 0,'streak_days':_streak(dates,today),'weekly':week,'due_reviews':int(due['due']),'tomorrow_preview':{'review_count':int(tomorrow_count['n']),'message':'明日は復習から始めましょう。' if tomorrow_count['n'] else '明日も今日のペースで5問進めましょう。'},'next_action':'復習から始める' if int(due['due']) else ('続きから再開' if status=='in_progress' else '今日の5問を始める')}
+
+def get_review_queue(user_id:int,limit:int=20,db_path:Path|str=DB_PATH):
+    today=date.today().isoformat();rows=fetch_all('''SELECT r.id review_id,r.scheduled_date,r.priority,r.status,q.id question_id,q.question_text,q.question_type,s.name subject_name,t.name topic_name,EXISTS(SELECT 1 FROM answer_history a WHERE a.user_id=r.user_id AND a.question_id=r.question_id AND date(a.answered_at)>=r.scheduled_date) completed FROM review_schedules r JOIN questions q ON q.id=r.question_id LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary' LEFT JOIN topics t ON t.id=m.topic_id LEFT JOIN subjects s ON s.id=t.subject_id WHERE r.user_id=? AND r.status='pending' AND q.status='published' ORDER BY CASE WHEN r.scheduled_date<=? THEN 0 ELSE 1 END,r.scheduled_date,r.priority DESC LIMIT ?''',(user_id,today,max(1,min(limit,100))),db_path)
+    items=[]
+    for r in rows:
+        label='完了' if r['completed'] else ('期限超過' if r['scheduled_date']<today else ('今日' if r['scheduled_date']==today else '今後'))
+        d=dict(r);d['review_label']=label;d['reason']='復習期限が到来しています' if label in {'期限超過','今日'} else '近日中の復習予定です';items.append(d)
+    return {'date':today,'items':items,'due_count':sum(1 for i in items if i['review_label'] in {'期限超過','今日'}),'upcoming_count':sum(1 for i in items if i['review_label']=='今後')}
+
+def get_teacher_support_summary(teacher_id:int,db_path:Path|str=DB_PATH):
+    students=list_students_for_teacher(teacher_id,db_path);today=date.today();rows=[]
+    for s in students:
+        last=fetch_one('SELECT MAX(answered_at) last_answered_at FROM answer_history WHERE user_id=?',(s['id'],),db_path)
+        due=fetch_one("SELECT COUNT(*) due FROM review_schedules WHERE user_id=? AND status='pending' AND scheduled_date<=?",(s['id'],today.isoformat()),db_path)
+        last_date=_iso_date(last['last_answered_at']) if last and last['last_answered_at'] else None
+        inactive_days=(today-last_date).days if last_date else None
+        risk='high' if (inactive_days is None or inactive_days>=7 or int(due['due'])>=10) else ('medium' if inactive_days>=3 or int(due['due'])>=5 else 'low')
+        weak=get_mastery_report(s['id'],db_path)[:3]
+        item=dict(s);item.update({'last_answered_at':last['last_answered_at'] if last else None,'inactive_days':inactive_days,'due_reviews':int(due['due']),'risk_level':risk,'weak_topics':weak});rows.append(item)
+    return sorted(rows,key=lambda x:({'high':0,'medium':1,'low':2}[x['risk_level']],-(x['due_reviews'] or 0),x['display_name']))
+
+def get_admin_quality_summary(db_path:Path|str=DB_PATH):
+    rows=fetch_all('''SELECT q.id,q.question_type,q.question_text,q.status,q.explanation_short,q.explanation_standard,q.explanation_detailed,COALESCE(s.permission_status,'missing') permission_status,(SELECT COUNT(*) FROM question_choices c WHERE c.question_id=q.id) choice_count FROM questions q LEFT JOIN question_sources s ON s.question_id=q.id WHERE s.id IS NULL OR s.id=(SELECT MAX(id) FROM question_sources WHERE question_id=q.id) ORDER BY q.id''',(),db_path)
+    items=[];counts={'ready':0,'needs_review':0,'blocked':0}
+    for r in rows:
+        issues=[]
+        if r['permission_status'] not in {'permission_confirmed','internal_sample','public_domain'}:issues.append('権利状態の確認が必要です')
+        if min(len(r['explanation_short'] or ''),len(r['explanation_standard'] or ''),len(r['explanation_detailed'] or ''))<2:issues.append('解説が不足しています')
+        if r['question_type']!='numeric' and int(r['choice_count'])<2:issues.append('選択肢が不足しています')
+        quality='blocked' if any('権利' in x for x in issues) else ('needs_review' if issues else 'ready')
+        counts[quality]+=1;items.append({'id':r['id'],'question_type':r['question_type'],'status':r['status'],'permission_status':r['permission_status'],'quality_status':quality,'issues':issues,'question_text':r['question_text']})
+    return {'counts':counts,'items':items}
 
 def start_diagnostic(user_id:int,question_count:int=30,db_path:Path|str=DB_PATH):
     old=fetch_one("SELECT * FROM diagnostic_sessions WHERE user_id=? AND status='in_progress' ORDER BY id DESC LIMIT 1",(user_id,),db_path)

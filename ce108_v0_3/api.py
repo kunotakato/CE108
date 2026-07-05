@@ -19,8 +19,14 @@ from ce108.services import (
     diagnostic_result,
     generate_daily_plan,
     get_diagnostic_state,
+    get_admin_quality_summary,
+    get_daily_status,
     get_question,
+    get_learning_summary,
+    get_mastery_report,
+    get_review_queue,
     get_student_summary_for_teacher,
+    get_teacher_support_summary,
     get_user,
     list_assignment_results,
     list_questions,
@@ -35,8 +41,15 @@ async def lifespan(app: FastAPI):
     seed_database()
     yield
 
-app = FastAPI(title='CE108 API', version='0.3.0', lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=['http://localhost:8501', 'http://127.0.0.1:8501'], allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
+LOCAL_ORIGINS = [
+    'http://localhost:8501',
+    'http://127.0.0.1:8501',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
+
+app = FastAPI(title='CE108 API', version='0.4.0', lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=LOCAL_ORIGINS, allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
 oauth = OAuth2PasswordBearer(tokenUrl='/api/auth/login')
 
 class AnswerRequest(BaseModel):
@@ -99,7 +112,7 @@ async def permission_error_handler(request: Request, exc: PermissionError):
 
 @app.get('/health')
 def health():
-    return {'status': 'ok', 'version': '0.3.0'}
+    return {'status': 'ok', 'version': '0.4.0'}
 
 @app.post('/api/auth/login')
 def login(form: Annotated[OAuth2PasswordRequestForm, Depends()]):
@@ -131,6 +144,23 @@ def answer(qid: int, req: AnswerRequest, user=Depends(require_role('student'))):
 def today(user=Depends(require_role('student'))):
     return generate_daily_plan(user['id'])
 
+@app.get('/api/study/daily-status')
+def daily_status(user=Depends(require_role('student'))):
+    return get_daily_status(user['id'])
+
+@app.get('/api/study/reviews')
+def review_queue(limit: int = 20, user=Depends(require_role('student'))):
+    return get_review_queue(user['id'], limit=limit)
+
+@app.get('/api/study/summary')
+def study_summary(user=Depends(require_role('student'))):
+    return get_learning_summary(user['id'])
+
+@app.get('/api/study/mastery')
+def study_mastery(limit: int = 3, user=Depends(require_role('student'))):
+    rows = get_mastery_report(user['id'])
+    return rows[:max(1, min(limit, 10))]
+
 @app.post('/api/diagnostics/start')
 def diag_start(user=Depends(require_role('student'))):
     return start_diagnostic(user['id'])
@@ -150,6 +180,10 @@ def diag_result(sid: int, user=Depends(require_role('student'))):
 @app.get('/api/teacher/students')
 def teacher_students(user=Depends(require_role('teacher'))):
     return list_students_for_teacher(user['id'])
+
+@app.get('/api/teacher/support')
+def teacher_support(user=Depends(require_role('teacher'))):
+    return get_teacher_support_summary(user['id'])
 
 @app.get('/api/teacher/students/{student_id}/summary')
 def teacher_student_summary(student_id: int, user=Depends(require_role('teacher'))):
@@ -171,6 +205,10 @@ def teacher_assignment_results_csv(assignment_id: int, user=Depends(require_role
 @app.get('/api/admin/questions')
 def admin_questions(limit: int = 500, user=Depends(require_role('admin'))):
     return list_questions(status='', limit=min(limit, 1000))
+
+@app.get('/api/admin/quality')
+def admin_quality(user=Depends(require_role('admin'))):
+    return get_admin_quality_summary()
 
 @app.post('/api/admin/questions')
 def admin_create_question(req: AdminQuestionRequest, user=Depends(require_role('admin'))):

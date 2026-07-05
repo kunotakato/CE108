@@ -50,8 +50,8 @@ def login():
     with b:st.code('学生: student@ce108.local\n教員: teacher@ce108.local\n管理者: admin@ce108.local\n共通: demo1234')
 
 def student_home(u):
-    hero(f"{u['display_name']}さんの学習ホーム",'今日の問題、復習、理解度を確認します。');s=get_learning_summary(u['id']);c=st.columns(4);c[0].metric('累計回答',f"{s['total']}問");c[1].metric('正答率',f"{s['accuracy']}%");c[2].metric('復習待ち',f"{s['due_reviews']}問");c[3].metric('平均回答時間',f"{s['avg_seconds']}秒")
-    p=generate_daily_plan(u['id']);done=sum(int(x['completed']) for x in p['items']);st.subheader('今日の学習');st.progress(done/max(1,len(p['items'])));st.write(f"{done}/{len(p['items'])}問完了｜目安{p['estimated_minutes']}分")
+    hero(f"{u['display_name']}さんの学習ホーム",'毎日続けるための今日の状態、復習、理解度を確認します。');s=get_learning_summary(u['id']);d=get_daily_status(u['id']);c=st.columns(4);c[0].metric('連続学習',f"{d['streak_days']}日");c[1].metric('正答率',f"{s['accuracy']}%");c[2].metric('復習待ち',f"{d['due_reviews']}問");c[3].metric('平均回答時間',f"{s['avg_seconds']}秒")
+    p=generate_daily_plan(u['id']);done=sum(int(x['completed']) for x in p['items']);st.subheader('今日の学習');st.progress(done/max(1,len(p['items'])));st.write(f"{done}/{len(p['items'])}問完了｜目安{p['estimated_minutes']}分｜次：{d['next_action']}");st.caption(d['tomorrow_preview']['message'])
     for x in p['items']:st.write(('✅' if x['completed'] else '⬜')+f" **{x['item_type']}**｜{x['subject_name']}｜{x['reason']}")
 
 def student_daily(u):
@@ -91,8 +91,8 @@ def mastery(u):
     if df.empty:st.info('データがありません。');return
     df['正答率']=df.apply(lambda r:round(r.correct_answers/r.total_answers*100,1) if r.total_answers else 0,axis=1);st.dataframe(df[['subject_name','topic_name','mastery_score','retention_score','total_answers','正答率']].rename(columns={'subject_name':'科目','topic_name':'分野','mastery_score':'理解度','retention_score':'定着度','total_answers':'回答数'}),width='stretch',hide_index=True);st.bar_chart(df.set_index('topic_name')['mastery_score'])
 def reviews(u):
-    hero('復習予定','回答結果に応じて再出題します。');r=list_due_reviews(u['id'])
-    if r:st.dataframe(pd.DataFrame(r),width='stretch',hide_index=True)
+    hero('復習予定','今日・期限超過・今後の復習を確認します。');q=get_review_queue(u['id'])
+    if q['items']:st.dataframe(pd.DataFrame(q['items']),width='stretch',hide_index=True)
     else:st.info('復習予定はありません。')
 def history(u):
     hero('学習履歴','日別の回答数と正答率です。');r=fetch_all("SELECT date(answered_at) day,COUNT(*) answers,ROUND(AVG(is_correct)*100,1) accuracy FROM answer_history WHERE user_id=? GROUP BY date(answered_at) ORDER BY day DESC",(u['id'],))
@@ -104,8 +104,9 @@ def assignments(u):
     else:st.info('課題はありません。')
 
 def teacher_dash(u):
-    hero('教員ダッシュボード','担当学生の学習状況を確認します。');r=list_students_for_teacher(u['id'])
-    if r:st.dataframe(pd.DataFrame(r),width='stretch',hide_index=True)
+    hero('教員ダッシュボード','担当学生の継続状況と要注意度を確認します。');r=get_teacher_support_summary(u['id'])
+    if r:
+        df=pd.DataFrame([{k:v for k,v in x.items() if k!='weak_topics'} for x in r]);st.dataframe(df,width='stretch',hide_index=True)
     else:st.info('担当学生がいません。')
 def teacher_task(u):
     hero('課題作成','既存問題から課題を配信します。');ss=list_students_for_teacher(u['id']);qs=list_questions(limit=200);so={f"{x['display_name']}（{x['grade']}）":x['id'] for x in ss};qo={f"Q{x['id']}｜{x['subject_name']}｜{x['question_text'][:35]}":x['id'] for x in qs}
@@ -121,7 +122,7 @@ def teacher_results(u):
     st.download_button('CSV出力',assignment_results_csv(u['id'],aid).encode('utf-8-sig'),f'assignment_{aid}_results.csv','text/csv',width='stretch')
 
 def admin_dash(u):
-    hero('管理者ダッシュボード','問題・権利・公開状態を管理します。');df=pd.DataFrame(list_questions(status='',limit=500));st.metric('登録問題数',len(df));st.dataframe(df,width='stretch',hide_index=True)
+    hero('管理者ダッシュボード','問題・権利・公開状態・品質状態を管理します。');q=get_admin_quality_summary();df=pd.DataFrame(q['items']);c=st.columns(4);c[0].metric('登録問題数',len(df));c[1].metric('公開可能',q['counts']['ready']);c[2].metric('要確認',q['counts']['needs_review']);c[3].metric('公開不可',q['counts']['blocked']);st.dataframe(df,width='stretch',hide_index=True)
 def admin_add(u):
     hero('問題登録','オリジナル問題または権利確認済み問題を登録します。');topics=list_topics();to={f"{x['code']}｜{x['name']}":x['code'] for x in topics}
     with st.form('addq2'):

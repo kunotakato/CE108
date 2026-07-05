@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.4.0-daily-learning-beta - 2026-07-02
+
+### Added
+- 学生が毎日開くためのホーム画面、連続学習、7日間の進捗、次アクション表示を追加。
+- 復習キューAPIとモバイル復習画面を追加。
+- 教員向けに担当学生の支援サマリー、リスク、未学習日数、復習待ち、苦手分野を追加。
+- 管理者向けに問題品質チェック、公開準備状況、権利状態、解説 completeness の確認を追加。
+- FastAPIに`/api/study/daily-status`、`/api/study/reviews`、`/api/teacher/support`、`/api/admin/quality`を追加。
+
+### Verified
+- Python unittest 26件成功。
+- Mobile unit test 5件成功。
+- Mobile E2E 7件成功。
+- `npm run typecheck`、`npm run lint`、`npm run build`成功。
+- FastAPIとモバイル主要画面をローカルで確認。
+
+### Release Notes
+- tag: `v0.4.0-daily-learning-beta`
+- v0.4はローカルβ検証用リリース。
+- LINE本番接続、国家試験過去問原文の追加、PostgreSQL移行、外部AI必須化は含まない。
+
 ## v0.3.0-internal-alpha - 2026-07-01
 
 ### Fixed
@@ -13,4 +34,3 @@
 - DBファイルは再生成可能なローカル成果物として`data/*.db`でGit管理対象外。
 - 収録問題はCE108オリジナルサンプル。国家試験過去問原文は含まない。
 - LINE/LIFFは署名検証、テスター希望保存、HTML雛形まで。本番接続は未実施。
-
