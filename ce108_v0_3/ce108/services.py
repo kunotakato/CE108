@@ -87,8 +87,11 @@ def generate_daily_plan(user_id:int,count:int|None=None,plan_date:str|None=None,
     for r in sorted([x for x in rows if x['id'] not in ids],key=priority,reverse=True)[:count-len(selected)]:
         typ,reason=('苦手','理解度が低い分野を優先') if r['mastery']<40 else (('必達','重要度・頻出度が高い') if r['importance']>=4 or r['frequency_score']>=2 else ('新規','未学習範囲を拡張'))
         selected.append((r['id'],typ,reason))
-    pid=execute("INSERT INTO daily_study_plans(user_id,plan_date,recommended_count,estimated_minutes,status,generated_at) VALUES(?,?,?,?, 'not_started',?)",(user_id,plan_date,len(selected),max(5,round(len(selected)*2.5)),utc_now()),db_path)
-    with connect(db_path) as conn:conn.executemany('INSERT INTO daily_study_plan_items(plan_id,question_id,item_type,display_order,reason) VALUES(?,?,?,?,?)',[(pid,q,t,i+1,r) for i,(q,t,r) in enumerate(selected)])
+    with connect(db_path) as conn:
+        cur=conn.execute("INSERT OR IGNORE INTO daily_study_plans(user_id,plan_date,recommended_count,estimated_minutes,status,generated_at) VALUES(?,?,?,?, 'not_started',?)",(user_id,plan_date,len(selected),max(5,round(len(selected)*2.5)),utc_now()))
+        if cur.rowcount:
+            pid=int(cur.lastrowid)
+            conn.executemany('INSERT INTO daily_study_plan_items(plan_id,question_id,item_type,display_order,reason) VALUES(?,?,?,?,?)',[(pid,q,t,i+1,r) for i,(q,t,r) in enumerate(selected)])
     return get_daily_plan(user_id,plan_date,db_path)
 
 def get_daily_plan(user_id:int,plan_date:str|None=None,db_path:Path|str=DB_PATH):

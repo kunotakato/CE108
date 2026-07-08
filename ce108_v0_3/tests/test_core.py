@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -88,6 +89,13 @@ class TestCore(unittest.TestCase):
     def test_daily_plan_generation(self):
         plan = generate_daily_plan(self.student['id'], count=5, db_path=self.db)
         self.assertEqual(len(plan['items']), 5)
+
+    def test_daily_status_concurrent_generation_is_stable(self):
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            statuses = list(executor.map(lambda _: get_daily_status(self.student['id'], self.db), range(4)))
+        plans = fetch_all('SELECT * FROM daily_study_plans WHERE user_id=? AND plan_date=?', (self.student['id'], date.today().isoformat()), self.db)
+        self.assertEqual(len(plans), 1)
+        self.assertTrue(all(s['total_count'] == statuses[0]['total_count'] for s in statuses))
 
     def test_daily_status_tracks_completion_and_streak(self):
         plan = generate_daily_plan(self.student['id'], count=5, db_path=self.db)
