@@ -2,6 +2,7 @@ import type {
   AnswerPayload,
   AnswerResult,
   DailyStatus,
+  FeedbackPayload,
   DailyPlan,
   LearningSummary,
   LoginResponse,
@@ -106,6 +107,14 @@ export async function getQuestion(token: string, id: number) {
 
 export async function submitAnswer(token: string, questionId: number, payload: AnswerPayload) {
   return apiFetch<AnswerResult>(`/api/questions/${questionId}/answer`, {
+    token,
+    method: "POST",
+    body: payload
+  });
+}
+
+export async function submitFeedback(token: string, payload: FeedbackPayload) {
+  return apiFetch<{ feedback_id: number; status: "saved" }>("/api/beta/feedback", {
     token,
     method: "POST",
     body: payload

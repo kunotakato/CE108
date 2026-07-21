@@ -36,9 +36,9 @@ export default function LoginPage() {
   return (
     <AppShell title="ログイン" nav={false}>
       <section className="hero stack">
-        <p className="eyebrow">Mobile Alpha v0.3.5</p>
+        <p className="eyebrow">Web Beta Prep v0.4.1</p>
         <h1>今日の5問を、スマホで続ける。</h1>
-        <p className="lead">CE108 の学生向けモバイル学習画面です。内部α版のデモ学生で確認できます。</p>
+        <p className="lead">CE108 の学生向けモバイル学習画面です。外部β検証ではサンプル問題で操作感を確認できます。</p>
       </section>
       <form className="panel form" onSubmit={handleSubmit}>
         <label className="field">

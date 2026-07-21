@@ -114,6 +114,11 @@ export default function HomePage() {
         <p className="lead">{nextWeak ? `${nextWeak.subject_name} / ${nextWeak.topic_name}` : "回答が増えると苦手分野を表示します。"}</p>
         <Link className="secondary-button" href="/mastery">理解度を見る</Link>
       </section>
+      <section className="panel stack">
+        <h2>β版への感想</h2>
+        <p className="muted">外部β検証では、使いやすさ・分かりにくさ・不具合を集めています。</p>
+        <Link className="secondary-button" href="/feedback">フィードバックを送る</Link>
+      </section>
     </AppShell>
   );
 }

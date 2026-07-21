@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.4.1-web-deployment-prep - 2026-07-21
+
+### Added
+- 外部URLで小規模β検証を行うためのデプロイ計画を追加。
+- `CE108_CORS_ORIGINS`でFastAPIのCORS許可オリジンを設定可能に変更。
+- 外部βテスター向けガイドを追加。
+- 学生モバイル画面にフィードバック送信画面を追加。
+- `/api/beta/feedback`で学生のβフィードバックを保存。
+
+### Fixed
+- ホーム画面の同時API呼び出しで日次プラン生成が競合する問題を修正。
+
+### Verified
+- Python unittest 29件成功。
+- `python -m compileall app.py api.py ce108 scripts tests`成功。
+- Mobile unit test 6件成功。
+- `npm run typecheck`、`npm run lint`、`npm run build`成功。
+
 ## v0.4.0-daily-learning-beta - 2026-07-02
 
 ### Added

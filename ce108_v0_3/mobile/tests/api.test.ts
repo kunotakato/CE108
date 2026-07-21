@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { assertQuestionSafe, getQuestion, login } from "@/lib/api";
+import { assertQuestionSafe, getQuestion, login, submitFeedback } from "@/lib/api";
 
 describe("api client", () => {
   it("posts demo login as form data", async () => {
@@ -43,6 +43,22 @@ describe("api client", () => {
     );
 
     await expect(getQuestion("token", 1)).rejects.toThrow("選択肢の解説情報");
+    vi.unstubAllGlobals();
+  });
+
+  it("posts beta feedback", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ feedback_id: 1, status: "saved" })
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await submitFeedback("token", { rating: 5, category: "使いやすさ", message: "続けられそうです。" });
+
+    expect(response.status).toBe("saved");
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/beta/feedback");
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    expect(fetchMock.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer token");
     vi.unstubAllGlobals();
   });
 });

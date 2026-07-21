@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from ce108.admin_service import approve_question, create_question, unpublish_question
-from ce108.config import LINE_CHANNEL_SECRET
+from ce108.config import CORS_ORIGINS, LINE_CHANNEL_SECRET
 from ce108.database import execute, utc_now
 from ce108.security import create_access_token, decode_access_token, verify_line_signature
 from ce108.seed import seed_database
@@ -33,6 +33,7 @@ from ce108.services import (
     list_students_for_teacher,
     public_question,
     record_answer,
+    save_beta_feedback,
     start_diagnostic,
 )
 
@@ -41,15 +42,8 @@ async def lifespan(app: FastAPI):
     seed_database()
     yield
 
-LOCAL_ORIGINS = [
-    'http://localhost:8501',
-    'http://127.0.0.1:8501',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-]
-
-app = FastAPI(title='CE108 API', version='0.4.0', lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=LOCAL_ORIGINS, allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
+app = FastAPI(title='CE108 API', version='0.4.1', lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
 oauth = OAuth2PasswordBearer(tokenUrl='/api/auth/login')
 
 class AnswerRequest(BaseModel):
@@ -85,6 +79,13 @@ class AdminQuestionRequest(BaseModel):
     permission_status: str = 'internal_sample'
     status: str = 'draft'
 
+class BetaFeedbackRequest(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    category: str
+    message: str = Field(min_length=3, max_length=2000)
+    page_url: str | None = None
+    user_agent: str | None = None
+
 def current_user(token: Annotated[str, Depends(oauth)]):
     try:
         payload = decode_access_token(token)
@@ -112,7 +113,7 @@ async def permission_error_handler(request: Request, exc: PermissionError):
 
 @app.get('/health')
 def health():
-    return {'status': 'ok', 'version': '0.4.0'}
+    return {'status': 'ok', 'version': '0.4.1'}
 
 @app.post('/api/auth/login')
 def login(form: Annotated[OAuth2PasswordRequestForm, Depends()]):
@@ -160,6 +161,11 @@ def study_summary(user=Depends(require_role('student'))):
 def study_mastery(limit: int = 3, user=Depends(require_role('student'))):
     rows = get_mastery_report(user['id'])
     return rows[:max(1, min(limit, 10))]
+
+@app.post('/api/beta/feedback')
+def beta_feedback(req: BetaFeedbackRequest, user=Depends(require_role('student'))):
+    feedback_id = save_beta_feedback(user['id'], req.rating, req.category, req.message, req.page_url, req.user_agent)
+    return {'feedback_id': feedback_id, 'status': 'saved'}
 
 @app.post('/api/diagnostics/start')
 def diag_start(user=Depends(require_role('student'))):

@@ -139,6 +139,14 @@ def get_review_queue(user_id:int,limit:int=20,db_path:Path|str=DB_PATH):
         d=dict(r);d['review_label']=label;d['reason']='復習期限が到来しています' if label in {'期限超過','今日'} else '近日中の復習予定です';items.append(d)
     return {'date':today,'items':items,'due_count':sum(1 for i in items if i['review_label'] in {'期限超過','今日'}),'upcoming_count':sum(1 for i in items if i['review_label']=='今後')}
 
+def save_beta_feedback(user_id:int,rating:int,category:str,message:str,page_url:str|None=None,user_agent:str|None=None,db_path:Path|str=DB_PATH)->int:
+    if rating<1 or rating>5:raise ValueError('評価は1から5で入力してください。')
+    category=(category or '').strip()
+    message=(message or '').strip()
+    if category not in {'使いやすさ','問題・解説','不具合','要望','その他'}:raise ValueError('フィードバック種別を選択してください。')
+    if len(message)<3:raise ValueError('フィードバック内容を3文字以上で入力してください。')
+    return execute('INSERT INTO beta_feedback(user_id,rating,category,message,page_url,user_agent,created_at) VALUES(?,?,?,?,?,?,?)',(user_id,rating,category,message,page_url,user_agent,utc_now()),db_path)
+
 def get_teacher_support_summary(teacher_id:int,db_path:Path|str=DB_PATH):
     students=list_students_for_teacher(teacher_id,db_path);today=date.today();rows=[]
     for s in students:

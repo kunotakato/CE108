@@ -234,13 +234,26 @@ h3 {
 
 .field input,
 .field select,
+.field textarea,
 .numeric-input {
   background: white;
   border: 1px solid var(--line);
   border-radius: 8px;
-  min-height: 48px;
   padding: 0 12px;
   width: 100%;
+}
+
+.field input,
+.field select,
+.numeric-input {
+  min-height: 48px;
+}
+
+.field textarea {
+  line-height: 1.5;
+  min-height: 132px;
+  padding: 12px;
+  resize: vertical;
 }
 
 .question-card {

@@ -10,3 +10,14 @@ LINE_CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET', '')
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN', '')
 LIFF_ID = os.getenv('LIFF_ID', '')
 PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL', 'http://localhost:8000')
+
+def csv_env(name: str, default: str = '') -> list[str]:
+    return [item.strip() for item in os.getenv(name, default).split(',') if item.strip()]
+
+LOCAL_CORS_ORIGINS = [
+    'http://localhost:8501',
+    'http://127.0.0.1:8501',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
+CORS_ORIGINS = csv_env('CE108_CORS_ORIGINS') or LOCAL_CORS_ORIGINS

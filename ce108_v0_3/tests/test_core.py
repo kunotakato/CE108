@@ -25,6 +25,7 @@ from ce108.services import (
     get_student_summary_for_teacher,
     get_teacher_support_summary,
     record_answer,
+    save_beta_feedback,
     schedule_review,
     start_diagnostic,
 )
@@ -115,6 +116,12 @@ class TestCore(unittest.TestCase):
         self.assertGreaterEqual(queue['due_count'], 1)
         self.assertIn(queue['items'][0]['review_label'], {'今日', '期限超過'})
 
+    def test_beta_feedback_is_saved(self):
+        feedback_id = save_beta_feedback(self.student['id'], 5, '使いやすさ', '毎日使えそうです', '/home', 'test-agent', self.db)
+        saved = fetch_one('SELECT * FROM beta_feedback WHERE id=?', (feedback_id,), self.db)
+        self.assertEqual(saved['user_id'], self.student['id'])
+        self.assertEqual(saved['rating'], 5)
+
     def test_unconfirmed_question_cannot_be_published(self):
         with self.assertRaises(ValueError):
             create_question(self.admin['id'], 'single', '権利未確認の問題', 'MED-ANAT', ['A', 'B'], ['1'], None, None, '短', '標準', '詳細', 3, 2, 'checking', 'published', self.db)
@@ -148,6 +155,7 @@ class TestApi(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from api import app
+        seed_database()
         cls.client = TestClient(app)
 
     def _token(self, username='student@ce108.local', password='demo1234'):
@@ -207,6 +215,12 @@ class TestApi(unittest.TestCase):
         res = self.client.get('/api/study/reviews', headers={'Authorization': f'Bearer {token}'})
         self.assertEqual(res.status_code, 200)
         self.assertIn('items', res.json())
+
+    def test_beta_feedback_api(self):
+        token = self._token()
+        res = self.client.post('/api/beta/feedback', headers={'Authorization': f'Bearer {token}'}, json={'rating': 4, 'category': '要望', 'message': '復習の導線を確認しました。', 'page_url': '/reviews'})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()['status'], 'saved')
 
     def test_teacher_support_api(self):
         token = self._token('teacher@ce108.local')

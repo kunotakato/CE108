@@ -1,6 +1,6 @@
-# CE108 Mobile Alpha v0.3.5
+# CE108 Mobile v0.4.1
 
-学生がスマートフォンで毎日5問を解くための Next.js/TypeScript フロントエンドです。教員・管理者画面は従来どおり Streamlit を利用します。
+学生がスマートフォンで毎日5問を解くための Next.js/TypeScript フロントエンドです。v0.4.1では外部β検証に向けて、公開API URLの切り替えとフィードバック送信画面を追加しています。教員・管理者画面は従来どおり Streamlit を利用します。
 
 ## 起動
 
@@ -18,6 +18,16 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 npm run dev -- --hostname 127.0.0
 ```
 
 ブラウザーで `http://127.0.0.1:3000/login` を開きます。
+
+## Web公開時の設定
+
+外部URLで使う場合は、デプロイ先の環境変数に公開済みFastAPI URLを設定します。
+
+```text
+NEXT_PUBLIC_API_BASE_URL=https://your-api.example.com
+```
+
+FastAPI側では、モバイルURLを`CE108_CORS_ORIGINS`に設定してください。
 
 ## デモログイン
 
@@ -40,8 +50,9 @@ Playwright のブラウザーが未導入の場合は、次を一度だけ実行
 npm run test:e2e:install
 ```
 
-## v0.3.5 の範囲
+## v0.4.1 の範囲
 
 - 学生用モバイル画面のみを対象にします。
+- ホーム、今日の5問、復習、理解度、フィードバック送信を対象にします。
 - LINE 本番接続、AI出題、React 以外への置換、PostgreSQL 化、国家試験過去問の追加は行いません。
 - 回答前の問題詳細では、正解コード、数値正解、選択肢解説、解説本文を表示しません。

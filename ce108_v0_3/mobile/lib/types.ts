@@ -142,3 +142,11 @@ export type SessionAnswer = {
   reviewDate: string;
   seconds: number;
 };
+
+export type FeedbackPayload = {
+  rating: number;
+  category: string;
+  message: string;
+  page_url?: string;
+  user_agent?: string;
+};

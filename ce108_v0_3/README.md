@@ -1,6 +1,6 @@
-# CE108 v0.4 Daily Learning Beta
+# CE108 v0.4.1 Web Deployment Preparation
 
-臨床工学技士国家試験対策のローカル実動プロトタイプです。v0.4では、学生が毎日使い続けるための日次学習体験、復習キュー、教員支援、管理者品質チェックを追加しています。
+臨床工学技士国家試験対策のローカル実動プロトタイプです。v0.4では、学生が毎日使い続けるための日次学習体験、復習キュー、教員支援、管理者品質チェックを追加しています。v0.4.1では、外部URLで小規模β検証を行うためのWeb公開準備を追加しています。
 
 ## 実装済み
 
@@ -64,6 +64,15 @@
 - 復習予定の「今日・期限超過・今後」表示
 - 教員向け要注意学生サマリーAPI
 - 管理者向け問題品質チェックAPI
+
+### Web Deployment Preparation v0.4.1
+- FastAPIのCORS許可オリジンを`CE108_CORS_ORIGINS`で設定可能
+- `/health`とモバイルパッケージのバージョンを`0.4.1`へ更新
+- デプロイ用環境変数サンプルを整理
+- `docs/DEPLOYMENT_PLAN.md`にWeb公開準備手順を追加
+- `docs/EXTERNAL_BETA_GUIDE.md`に外部βテスターへ共有する前の準備事項を追加
+- 学生モバイル画面からβフィードバックを送信可能
+- 同時アクセス時の日次プラン生成競合を修正
 
 ## 重要事項
 
@@ -156,6 +165,32 @@ POST /api/admin/questions/{qid}/unpublish
 ```
 
 学生向けの問題詳細APIは、回答前に正答コード、数値正答、選択肢ごとの正誤を返しません。
+
+### Web公開準備
+
+外部URLでスマホ版を使うには、Next.jsだけでなくFastAPIも公開する必要があります。
+
+FastAPI側の主な環境変数:
+
+```text
+CE108_APP_SECRET=replace-with-a-long-random-secret
+CE108_DB_PATH=/path/to/persistent/ce108.db
+CE108_CORS_ORIGINS=https://your-mobile-app.example.com
+PUBLIC_BASE_URL=https://your-api.example.com
+```
+
+モバイル側の主な環境変数:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=https://your-api.example.com
+```
+
+詳細は次を参照してください。
+
+```text
+docs/DEPLOYMENT_PLAN.md
+docs/EXTERNAL_BETA_GUIDE.md
+```
 
 ## Mobile Alpha v0.3.5
 
