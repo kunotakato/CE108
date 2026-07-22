@@ -4,6 +4,7 @@
 
 ### Added
 - 外部URLで小規模β検証を行うためのデプロイ計画を追加。
+- Render Blueprint `render.yaml` とRenderデプロイ手順を追加。
 - `CE108_CORS_ORIGINS`でFastAPIのCORS許可オリジンを設定可能に変更。
 - 外部βテスター向けガイドを追加。
 - 学生モバイル画面にフィードバック送信画面を追加。

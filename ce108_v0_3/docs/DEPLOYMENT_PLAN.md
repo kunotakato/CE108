@@ -118,6 +118,23 @@ CE108_CORS_ORIGINS=https://ce108-mobile.vercel.app,https://ce108-admin.example.c
 
 Do not use wildcard CORS for shared beta or production use.
 
+## Render Deployment
+
+Use the repository-level `render.yaml` for a concrete Render setup.
+
+Details:
+
+```text
+docs/RENDER_DEPLOYMENT.md
+```
+
+Important:
+
+- Render web services must bind to `0.0.0.0:$PORT`.
+- `ce108-api` should use a persistent disk if SQLite data must survive restarts.
+- Render Free web services do not preserve local SQLite files.
+- Deploy or redeploy `ce108-mobile` after setting `NEXT_PUBLIC_API_BASE_URL`.
+
 ## Web Beta Acceptance Checks
 
 - `/health` returns `0.4.1`.

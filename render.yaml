@@ -1,0 +1,54 @@
+# Render Blueprint for CE108 v0.4.1 web beta.
+#
+# This creates two web services:
+# - ce108-api: FastAPI backend
+# - ce108-mobile: Next.js student mobile frontend
+#
+# For a persistent SQLite beta, keep ce108-api on a paid plan with the disk below.
+# Render Free web services have ephemeral filesystems and are only suitable for
+# short smoke tests.
+services:
+  - type: web
+    name: ce108-api
+    runtime: python
+    plan: starter
+    rootDir: ce108_v0_3
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/init_db.py && uvicorn api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    disk:
+      name: ce108-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
+      - key: CE108_APP_SECRET
+        generateValue: true
+      - key: CE108_DB_PATH
+        value: /var/data/ce108.db
+      - key: CE108_TOKEN_TTL_SECONDS
+        value: "43200"
+      - key: CE108_CORS_ORIGINS
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: LINE_CHANNEL_ACCESS_TOKEN
+        sync: false
+      - key: LIFF_ID
+        sync: false
+
+  - type: web
+    name: ce108-mobile
+    runtime: node
+    plan: free
+    rootDir: ce108_v0_3/mobile
+    buildCommand: npm install && npm run build
+    startCommand: npm run start -- -H 0.0.0.0 -p $PORT
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false

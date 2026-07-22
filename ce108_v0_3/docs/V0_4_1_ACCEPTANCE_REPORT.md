@@ -20,6 +20,8 @@ This release keeps the v0.4 feature set and architecture, then adds deployment-o
 - Mobile environment example explains local and deployed API URLs.
 - FastAPI `.env.example` documents web deployment variables.
 - Deployment plan added in `docs/DEPLOYMENT_PLAN.md`.
+- Render Blueprint added at repository root as `render.yaml`.
+- Render deployment guide added in `docs/RENDER_DEPLOYMENT.md`.
 - External beta guide added in `docs/EXTERNAL_BETA_GUIDE.md`.
 - Authenticated beta feedback API added at `/api/beta/feedback`.
 - Mobile feedback screen added at `/feedback`.

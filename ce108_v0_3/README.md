@@ -189,6 +189,7 @@ NEXT_PUBLIC_API_BASE_URL=https://your-api.example.com
 
 ```text
 docs/DEPLOYMENT_PLAN.md
+docs/RENDER_DEPLOYMENT.md
 docs/EXTERNAL_BETA_GUIDE.md
 ```
 
