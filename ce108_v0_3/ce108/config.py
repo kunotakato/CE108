@@ -20,4 +20,7 @@ LOCAL_CORS_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
 ]
-CORS_ORIGINS = csv_env('CE108_CORS_ORIGINS') or LOCAL_CORS_ORIGINS
+DEPLOYED_CORS_ORIGINS = [
+    'https://ce108-mobile.onrender.com',
+]
+CORS_ORIGINS = csv_env('CE108_CORS_ORIGINS') or (LOCAL_CORS_ORIGINS + DEPLOYED_CORS_ORIGINS)
