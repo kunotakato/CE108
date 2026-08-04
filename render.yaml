@@ -12,6 +12,7 @@ services:
     name: ce108-api
     runtime: python
     plan: starter
+    branch: feature/v0.4.1-web-deployment-prep
     rootDir: ce108_v0_3
     buildCommand: pip install -r requirements.txt
     startCommand: python scripts/init_db.py && uvicorn api:app --host 0.0.0.0 --port $PORT
@@ -44,6 +45,7 @@ services:
     name: ce108-mobile
     runtime: node
     plan: free
+    branch: feature/v0.4.1-web-deployment-prep
     rootDir: ce108_v0_3/mobile
     buildCommand: npm install && npm run build
     startCommand: npm run start -- -H 0.0.0.0 -p $PORT
