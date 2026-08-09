@@ -207,6 +207,43 @@ function StudyPageContent() {
               <p>{result.question.explanation_standard || result.question.explanation_short || "解説は登録されていません。"}</p>
               <p className="muted">復習日: {result.review_date}</p>
             </div>
+            {result.question.choice_feedback?.length ? (
+              <div className="choice-feedback-list">
+                {result.question.choice_feedback.map((choice) => (
+                  <article
+                    className={`choice-feedback ${choice.is_correct ? "correct-choice" : choice.selected ? "selected-wrong-choice" : ""}`}
+                    key={choice.choice_code}
+                  >
+                    <div className="choice-feedback-header">
+                      <span className="choice-code">{choice.choice_code}</span>
+                      <span>{choice.feedback_label}</span>
+                    </div>
+                    <p className="choice-feedback-text">{choice.choice_text}</p>
+                    <p className="muted">{choice.explanation || "この選択肢の解説は登録されていません。"}</p>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+            {result.related_questions?.length ? (
+              <div className="related-question-list">
+                <h3>この知識を太くする問題</h3>
+                {result.related_questions.map((related) => (
+                  <button
+                    className="related-question"
+                    key={related.id}
+                    type="button"
+                    onClick={() => {
+                      setCurrentIndex(items.findIndex((planItem) => planItem.question_id === related.id));
+                      void loadQuestion(related.id);
+                    }}
+                    disabled={items.every((planItem) => planItem.question_id !== related.id)}
+                  >
+                    <span>{related.topic_name}</span>
+                    <strong>{related.question_text}</strong>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </section>
         ) : null}
       </div>

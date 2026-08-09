@@ -41,20 +41,23 @@ def import_questions_csv(content:bytes,admin_id:int,db_path:Path|str=DB_PATH):
                 qid=conn.execute('''INSERT INTO questions(question_type,question_text,numeric_answer,numeric_tolerance,unit,explanation_short,explanation_standard,explanation_detailed,difficulty,importance,frequency_score,source_type,status,created_by,approved_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(row['question_type'].strip(),row['question_text'].strip(),float(row['numeric_answer']) if row.get('numeric_answer') else None,float(row.get('numeric_tolerance') or .01),row.get('unit') or None,row['explanation_short'],row['explanation_standard'],row['explanation_detailed'],int(row['difficulty']),int(row['importance']),float(row['frequency_score']),row['source_type'],status,admin_id,admin_id if status=='published' else None,utc_now(),utc_now())).lastrowid
                 for i in range(1,6):
                     ch=(row.get(f'choice_{i}') or '').strip()
-                    if ch:conn.execute("INSERT INTO question_choices(question_id,choice_code,choice_text,is_correct,explanation,display_order) VALUES(?,?,?,?, '',?)",(qid,str(i),ch,int(str(i) in correct),i))
+                    explanation=(row.get(f'choice_{i}_explanation') or '').strip()
+                    if ch:conn.execute("INSERT INTO question_choices(question_id,choice_code,choice_text,is_correct,explanation,display_order) VALUES(?,?,?,?,?,?)",(qid,str(i),ch,int(str(i) in correct),explanation,i))
                 conn.execute("INSERT INTO question_topic_mappings(question_id,topic_id,mapping_type,weight) VALUES(?,?,'primary',1.0)",(qid,tid));conn.execute('''INSERT INTO question_sources(question_id,source_name,source_url,copyright_holder,permission_status,checked_at,checked_by) VALUES(?,?,?,?,?,?,?)''',(qid,row.get('source_name'),row.get('source_url'),row.get('copyright_holder'),permission,utc_now(),admin_id));inserted+=1
             except Exception as e:errors.append(f'{line}行目: {e}')
     audit(admin_id,'csv_import','questions',after={'inserted':inserted,'errors':errors},db_path=db_path);return {'inserted':inserted,'errors':errors}
 
-def create_question(admin_id:int,question_type:str,question_text:str,topic_code:str,choices:list[str],correct_codes:list[str],numeric_answer:float|None,unit:str|None,short:str,standard:str,detailed:str,importance:int,difficulty:int,permission_status='internal_sample',status='draft',db_path:Path|str=DB_PATH):
+def create_question(admin_id:int,question_type:str,question_text:str,topic_code:str,choices:list[str],correct_codes:list[str],numeric_answer:float|None,unit:str|None,short:str,standard:str,detailed:str,importance:int,difficulty:int,permission_status='internal_sample',status='draft',db_path:Path|str=DB_PATH,choice_explanations:list[str]|None=None):
     _validate_question(question_type,question_text,choices,set(correct_codes),numeric_answer,short,standard,detailed,difficulty,importance)
     with connect(db_path) as conn:
         t=conn.execute('SELECT id FROM topics WHERE code=?',(topic_code,)).fetchone()
         if not t:raise ValueError('出題基準コードがありません。')
         if status=='published' and permission_status not in PUBLISHABLE:raise ValueError('権利確認未完了の問題は公開できません。')
         qid=conn.execute("""INSERT INTO questions(question_type,question_text,numeric_answer,numeric_tolerance,unit,explanation_short,explanation_standard,explanation_detailed,difficulty,importance,frequency_score,source_type,status,created_by,approved_by,created_at,updated_at) VALUES(?,?,?,.01,?,?,?,?,?,?,1.0,'original',?,?,?,?,?)""",(question_type,question_text,numeric_answer,unit,short,standard,detailed,difficulty,importance,status,admin_id,admin_id if status=='published' else None,utc_now(),utc_now())).lastrowid
+        choice_explanations=choice_explanations or []
         for i,ch in enumerate(choices,1):
-            if ch.strip():conn.execute("INSERT INTO question_choices(question_id,choice_code,choice_text,is_correct,explanation,display_order) VALUES(?,?,?,?, '',?)",(qid,str(i),ch.strip(),int(str(i) in correct_codes),i))
+            explanation=choice_explanations[i-1].strip() if i-1<len(choice_explanations) and choice_explanations[i-1] else ''
+            if ch.strip():conn.execute("INSERT INTO question_choices(question_id,choice_code,choice_text,is_correct,explanation,display_order) VALUES(?,?,?,?,?,?)",(qid,str(i),ch.strip(),int(str(i) in correct_codes),explanation,i))
         conn.execute("INSERT INTO question_topic_mappings(question_id,topic_id,mapping_type,weight) VALUES(?,?,'primary',1.0)",(qid,t['id']));conn.execute("INSERT INTO question_sources(question_id,source_name,copyright_holder,permission_status,checked_at,checked_by) VALUES(?,'管理画面作成','CE108',?,?,?)",(qid,permission_status,utc_now(),admin_id))
     audit(admin_id,'create','question',qid,db_path=db_path);return qid
 

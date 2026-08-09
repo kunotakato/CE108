@@ -66,12 +66,15 @@ def seed_database(db_path:Path|str=DB_PATH):
             tm={r['code']:r['id'] for r in conn.execute('SELECT id,code FROM topics')};admin=conn.execute("SELECT id FROM users WHERE role='admin'").fetchone()['id']
             for q in QUESTIONS:
                 qid=conn.execute("""INSERT INTO questions(question_type,question_text,numeric_answer,numeric_tolerance,unit,explanation_short,explanation_standard,explanation_detailed,difficulty,importance,frequency_score,source_type,status,created_by,approved_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,2,?,?,'sample_original','published',?,?,?,?)""",(q['type'],q['text'],q.get('numeric_answer'),q.get('tolerance',.01),q.get('unit'),q['short'],q['standard'],q['detailed'],q['importance'],q['frequency'],admin,admin,now,now)).lastrowid
-                for i,ch in enumerate(q.get('choices',[]),1):conn.execute("INSERT INTO question_choices(question_id,choice_code,choice_text,is_correct,explanation,display_order) VALUES(?,?,?,?,?,?)",(qid,str(i),ch,int(str(i) in q.get('correct',[])),'',i))
+                for i,ch in enumerate(q.get('choices',[]),1):
+                    is_correct=int(str(i) in q.get('correct',[]))
+                    explanation=q['short'] if is_correct else f'{ch}は本問の正答ではありません。正答の根拠と比較し、どの条件が合わないかを確認してください。'
+                    conn.execute("INSERT INTO question_choices(question_id,choice_code,choice_text,is_correct,explanation,display_order) VALUES(?,?,?,?,?,?)",(qid,str(i),ch,is_correct,explanation,i))
                 conn.execute("INSERT INTO question_topic_mappings(question_id,topic_id,mapping_type,weight) VALUES(?,?,'primary',1.0)",(qid,tm[q['topic']]))
                 conn.execute("INSERT INTO question_sources(question_id,source_name,copyright_holder,permission_status,checked_at,checked_by) VALUES(?,'CE108オリジナルサンプル','CE108','internal_sample',?,?)",(qid,now,admin))
 
 def export_question_template(path:Path|None=None)->Path:
-    path=path or DATA_DIR/'question_import_template.csv';cols=['question_type','question_text','choice_1','choice_2','choice_3','choice_4','choice_5','correct_codes','numeric_answer','numeric_tolerance','unit','topic_code','explanation_short','explanation_standard','explanation_detailed','difficulty','importance','frequency_score','source_type','source_name','source_url','copyright_holder','permission_status','status']
+    path=path or DATA_DIR/'question_import_template.csv';cols=['question_type','question_text','choice_1','choice_2','choice_3','choice_4','choice_5','choice_1_explanation','choice_2_explanation','choice_3_explanation','choice_4_explanation','choice_5_explanation','correct_codes','numeric_answer','numeric_tolerance','unit','topic_code','explanation_short','explanation_standard','explanation_detailed','difficulty','importance','frequency_score','source_type','source_name','source_url','copyright_holder','permission_status','status']
     with path.open('w',encoding='utf-8-sig',newline='') as f:
-        w=csv.writer(f);w.writerow(cols);w.writerow(['single','サンプル問題文','選択肢1','選択肢2','選択肢3','選択肢4','選択肢5','1','','0.01','','MED-ANAT','一言解説','標準解説','詳細解説','2','3','1.0','original','作成者名','','権利者','permission_confirmed','draft'])
+        w=csv.writer(f);w.writerow(cols);w.writerow(['single','サンプル問題文','選択肢1','選択肢2','選択肢3','選択肢4','選択肢5','選択肢1が正しい理由','選択肢2が誤りの理由','選択肢3が誤りの理由','選択肢4が誤りの理由','選択肢5が誤りの理由','1','','0.01','','MED-ANAT','一言解説','標準解説','詳細解説','2','3','1.0','original','作成者名','','権利者','permission_confirmed','draft'])
     return path

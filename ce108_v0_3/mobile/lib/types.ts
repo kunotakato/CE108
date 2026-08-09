@@ -80,7 +80,17 @@ export type AnswerResult = {
     explanation_detailed?: string;
     numeric_answer?: number | null;
     choices?: Array<Choice & { is_correct?: number; explanation?: string | null }>;
+    choice_feedback?: Array<Choice & { is_correct?: boolean; selected?: boolean; explanation?: string | null; feedback_label?: string }>;
   };
+  related_questions?: Array<{
+    id: number;
+    question_text: string;
+    question_type: QuestionType;
+    importance: number;
+    subject_name: string;
+    topic_name: string;
+    answered: number;
+  }>;
 };
 
 export type LearningSummary = {

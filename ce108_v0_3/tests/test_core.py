@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from ce108.admin_service import approve_question, create_question
+from ce108.admin_service import approve_question, create_question, import_questions_csv
 from ce108.database import connect, fetch_all, fetch_one
 from ce108.security import hash_password
 from ce108.seed import seed_database
@@ -75,6 +75,17 @@ class TestCore(unittest.TestCase):
         saved = fetch_one('SELECT * FROM answer_history WHERE user_id=? AND question_id=?', (self.student['id'], q['id']), self.db)
         self.assertTrue(result['is_correct'])
         self.assertEqual(saved['is_correct'], 1)
+
+    def test_answer_returns_choice_feedback_and_related_questions(self):
+        q = get_question(1, self.db)
+        wrong = next(c['choice_code'] for c in q['choices'] if c['choice_code'] not in q['correct_codes'])
+        result = record_answer(self.student['id'], q['id'], [wrong], None, '迷った', 40, 'test', db_path=self.db)
+        self.assertIn('choice_feedback', result['question'])
+        selected_feedback = [c for c in result['question']['choice_feedback'] if c['selected']]
+        self.assertTrue(selected_feedback)
+        self.assertFalse(selected_feedback[0]['is_correct'])
+        self.assertTrue(selected_feedback[0]['explanation'])
+        self.assertIn('related_questions', result)
 
     def test_numeric_tolerance(self):
         q = next(get_question(r['id'], self.db) for r in fetch_all("SELECT id FROM questions WHERE question_type='numeric'", (), self.db))
@@ -162,6 +173,23 @@ class TestCore(unittest.TestCase):
         with self.assertRaises(ValueError):
             approve_question(qid, self.admin['id'], self.db)
 
+    def test_admin_question_choice_explanations_are_saved(self):
+        qid = create_question(self.admin['id'], 'single', '選択肢解説つき問題', 'MED-ANAT', ['A', 'B'], ['1'], None, None, '短', '標準', '詳細', 3, 2, 'internal_sample', 'published', self.db, ['Aが正しい理由', 'Bが誤りの理由'])
+        q = get_question(qid, self.db)
+        self.assertEqual(q['choices'][0]['explanation'], 'Aが正しい理由')
+        self.assertEqual(q['choices'][1]['explanation'], 'Bが誤りの理由')
+
+    def test_csv_choice_explanations_are_saved(self):
+        content = '\n'.join([
+            'question_type,question_text,choice_1,choice_2,choice_3,choice_4,choice_5,choice_1_explanation,choice_2_explanation,choice_3_explanation,choice_4_explanation,choice_5_explanation,correct_codes,numeric_answer,numeric_tolerance,unit,topic_code,explanation_short,explanation_standard,explanation_detailed,difficulty,importance,frequency_score,source_type,source_name,source_url,copyright_holder,permission_status,status',
+            'single,CSV選択肢解説問題,A,B,,,,Aが正しい理由,Bが誤りの理由,,,,1,,0.01,,MED-ANAT,短,標準,詳細,2,3,1.0,original,CE108,,CE108,internal_sample,published',
+        ]).encode('utf-8-sig')
+        result = import_questions_csv(content, self.admin['id'], self.db)
+        self.assertEqual(result['inserted'], 1)
+        qid = fetch_one("SELECT id FROM questions WHERE question_text='CSV選択肢解説問題'", (), self.db)['id']
+        q = get_question(qid, self.db)
+        self.assertEqual(q['choices'][1]['explanation'], 'Bが誤りの理由')
+
     def test_teacher_support_summary_contains_risk(self):
         rows = get_teacher_support_summary(self.teacher['id'], self.db)
         self.assertTrue(rows)
@@ -212,6 +240,7 @@ class TestApi(unittest.TestCase):
         self.assertNotIn('explanation_short', text)
         self.assertNotIn('explanation_standard', text)
         self.assertNotIn('explanation_detailed', text)
+        self.assertNotIn('choice_feedback', text)
 
     def test_study_summary_api(self):
         token = self._token()

@@ -42,6 +42,43 @@ def public_question(q:dict)->dict:
     for c in safe.get('choices',[]):c.pop('is_correct',None);c.pop('explanation',None)
     return safe
 
+def related_questions(user_id:int,question_id:int,limit:int=3,db_path:Path|str=DB_PATH):
+    topic=fetch_one("SELECT topic_id FROM question_topic_mappings WHERE question_id=? AND mapping_type='primary'",(question_id,),db_path)
+    if not topic:return []
+    rows=fetch_all('''SELECT q.id,q.question_text,q.question_type,q.importance,s.name subject_name,t.name topic_name,
+        EXISTS(SELECT 1 FROM answer_history a WHERE a.user_id=? AND a.question_id=q.id) answered
+        FROM question_topic_mappings m
+        JOIN questions q ON q.id=m.question_id
+        JOIN topics t ON t.id=m.topic_id
+        JOIN subjects s ON s.id=t.subject_id
+        WHERE m.topic_id=? AND q.id<>? AND q.status='published'
+        ORDER BY answered ASC,q.importance DESC,q.id LIMIT ?''',(user_id,topic['topic_id'],question_id,max(1,min(limit,10))),db_path)
+    return [dict(r) for r in rows]
+
+def _choice_feedback(q:dict,selected_codes:list[str]|None):
+    selected=set(selected_codes or [])
+    correct=set(q.get('correct_codes') or [])
+    items=[]
+    for choice in q.get('choices',[]):
+        d=dict(choice)
+        d['selected']=d['choice_code'] in selected
+        d['is_correct']=bool(d.get('is_correct'))
+        if not (d.get('explanation') or '').strip():
+            if d['is_correct']:
+                d['explanation']=q.get('explanation_short') or 'この選択肢が正解です。'
+            elif d['selected']:
+                d['explanation']='この選択肢は本問の正答ではありません。正答の根拠と比較して、どの条件がずれているかを確認しましょう。'
+            else:
+                d['explanation']='この選択肢は正答ではありません。用語の意味と適用場面を正答と区別して覚えましょう。'
+        if d['choice_code'] in correct:
+            d['feedback_label']='正答'
+        elif d['choice_code'] in selected:
+            d['feedback_label']='選んだ誤答'
+        else:
+            d['feedback_label']='誤答'
+        items.append(d)
+    return items
+
 def check_answer(q:dict,selected_codes:list[str]|None=None,numeric_answer:float|None=None)->bool:
     if q['question_type']=='numeric':
         return numeric_answer is not None and math.isclose(float(numeric_answer),float(q['numeric_answer']),rel_tol=float(q.get('numeric_tolerance') or .01),abs_tol=float(q.get('numeric_tolerance') or .01))
@@ -76,7 +113,8 @@ def record_answer(user_id:int,question_id:int,selected_codes:list[str]|None,nume
     correct=check_answer(q,selected_codes,numeric_answer)
     execute('''INSERT INTO answer_history(user_id,question_id,selected_answer,numeric_answer,is_correct,confidence_level,response_time_seconds,answer_mode,session_id,answered_at) VALUES(?,?,?,?,?,?,?,?,?,?)''',(user_id,question_id,json.dumps(selected_codes or [],ensure_ascii=False),numeric_answer,int(correct),confidence,max(0,int(response_time_seconds)),answer_mode,session_id,utc_now()),db_path)
     update_mastery(user_id,question_id,correct,confidence,response_time_seconds,db_path);review=schedule_review(user_id,question_id,correct,confidence,int(q['importance']),db_path)
-    return {'is_correct':correct,'review_date':review,'question':q}
+    q['choice_feedback']=_choice_feedback(q,selected_codes)
+    return {'is_correct':correct,'review_date':review,'question':q,'related_questions':related_questions(user_id,question_id,db_path=db_path)}
 
 def _count(minutes:int)->int:return max(3,min(20,round(minutes/3)))
 

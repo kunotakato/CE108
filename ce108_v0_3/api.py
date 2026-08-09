@@ -73,6 +73,7 @@ class AdminQuestionRequest(BaseModel):
     question_text: str
     topic_code: str
     choices: list[str] = Field(default_factory=list)
+    choice_explanations: list[str] = Field(default_factory=list)
     correct_codes: list[str] = Field(default_factory=list)
     numeric_answer: float | None = None
     unit: str | None = None
@@ -272,7 +273,7 @@ def admin_quality(user=Depends(require_role('admin'))):
 
 @app.post('/api/admin/questions')
 def admin_create_question(req: AdminQuestionRequest, user=Depends(require_role('admin'))):
-    qid = create_question(user['id'], req.question_type, req.question_text, req.topic_code, req.choices, req.correct_codes, req.numeric_answer, req.unit, req.explanation_short, req.explanation_standard, req.explanation_detailed, req.importance, req.difficulty, req.permission_status, req.status)
+    qid = create_question(user['id'], req.question_type, req.question_text, req.topic_code, req.choices, req.correct_codes, req.numeric_answer, req.unit, req.explanation_short, req.explanation_standard, req.explanation_detailed, req.importance, req.difficulty, req.permission_status, req.status, choice_explanations=req.choice_explanations)
     return {'question_id': qid}
 
 @app.post('/api/admin/questions/{qid}/approve')
