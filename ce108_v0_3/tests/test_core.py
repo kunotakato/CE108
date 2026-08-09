@@ -21,11 +21,15 @@ from ce108.services import (
     get_daily_status,
     get_diagnostic_state,
     get_mastery_report,
+    get_note_question,
     get_question,
     get_review_queue,
     get_student_summary_for_teacher,
     get_teacher_support_summary,
     get_study_strategy,
+    create_student_note,
+    generate_note_questions,
+    answer_note_question,
     record_answer,
     add_exam_event,
     add_score_record,
@@ -121,6 +125,18 @@ class TestCore(unittest.TestCase):
         seed_database(self.db)
         restored = fetch_one('SELECT id FROM questions WHERE question_text=?', (text,), self.db)
         self.assertIsNotNone(restored)
+
+    def test_note_ai_generates_private_questions_and_answers(self):
+        note_id = create_student_note(self.student['id'], '呼吸メモ', '人工呼吸管理ではPEEPにより呼気終末の肺胞虚脱を抑える。PaCO2上昇は肺胞換気不足を示唆するため注意が必要である。', db_path=self.db)
+        generated = generate_note_questions(self.student['id'], note_id, 2, self.db)
+        self.assertEqual(generated['generated_count'], 2)
+        question = get_note_question(self.student['id'], generated['questions'][0]['id'], self.db)
+        text = json.dumps(question, ensure_ascii=False)
+        self.assertNotIn('correct_code', text)
+        self.assertNotIn('choice_feedback', text)
+        result = answer_note_question(self.student['id'], question['id'], '1', 'たぶん分かる', 20, self.db)
+        self.assertTrue(result['is_correct'])
+        self.assertIn('choice_feedback', result['question'])
 
     def test_focus_plan_modes(self):
         medical = get_focus_plan(self.student['id'], 'medical', 5, self.db)
@@ -302,6 +318,19 @@ class TestApi(unittest.TestCase):
         res = self.client.post('/api/beta/feedback', headers={'Authorization': f'Bearer {token}'}, json={'rating': 4, 'category': '要望', 'message': '復習の導線を確認しました。', 'page_url': '/reviews'})
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()['status'], 'saved')
+
+    def test_note_ai_api_flow(self):
+        token = self._token()
+        res = self.client.post('/api/notes', headers={'Authorization': f'Bearer {token}'}, json={'title': '透析メモ', 'content': '透析では拡散により小分子溶質を除去する。除水量を過大に設定すると循環血液量が低下し血圧低下に注意が必要である。'})
+        self.assertEqual(res.status_code, 200, res.text)
+        note_id = res.json()['note_id']
+        res = self.client.post(f'/api/notes/{note_id}/generate', headers={'Authorization': f'Bearer {token}'}, json={'count': 2})
+        self.assertEqual(res.status_code, 200, res.text)
+        q = res.json()['questions'][0]
+        self.assertNotIn('correct_code', json.dumps(q, ensure_ascii=False))
+        res = self.client.post(f"/api/note-questions/{q['id']}/answer", headers={'Authorization': f'Bearer {token}'}, json={'selected_code': '1', 'confidence': 'たぶん分かる', 'response_time_seconds': 10})
+        self.assertEqual(res.status_code, 200, res.text)
+        self.assertTrue(res.json()['is_correct'])
 
     def test_teacher_support_api(self):
         token = self._token('teacher@ce108.local')

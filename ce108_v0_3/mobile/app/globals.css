@@ -84,7 +84,7 @@ a {
   border-top: 1px solid var(--line);
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   height: calc(64px + env(safe-area-inset-bottom));
   left: 0;
   padding: 6px 10px env(safe-area-inset-bottom);
@@ -98,10 +98,15 @@ a {
   border-radius: 8px;
   color: var(--muted);
   display: flex;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   justify-content: center;
   min-height: 44px;
+}
+
+.note-textarea {
+  min-height: 180px;
+  resize: vertical;
 }
 
 .hero,

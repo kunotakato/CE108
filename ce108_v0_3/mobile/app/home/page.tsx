@@ -115,6 +115,11 @@ export default function HomePage() {
         <Link className="secondary-button" href="/mastery">理解度を見る</Link>
       </section>
       <section className="panel stack">
+        <h2>ノートから問題作成</h2>
+        <p className="muted">授業メモや模試復習メモから、CE108が重要点を拾ってオリジナル問題を作ります。</p>
+        <Link className="secondary-button" href="/notes">ノートAIを使う</Link>
+      </section>
+      <section className="panel stack">
         <h2>β版への感想</h2>
         <p className="muted">外部β検証では、使いやすさ・分かりにくさ・不具合を集めています。</p>
         <Link className="secondary-button" href="/feedback">フィードバックを送る</Link>

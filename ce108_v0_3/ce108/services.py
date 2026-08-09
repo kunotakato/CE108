@@ -1,5 +1,5 @@
 from __future__ import annotations
-import csv, io, json, math
+import csv, io, json, math, re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -12,6 +12,19 @@ FOCUS_MODES={
     'engineering': {'label':'工学重点','subjects':{'EEE','MECH','MAT','SUP','THER','MEAS','SAFE'},'reason':'工学・装置・安全分野を固めるために選びました。'},
     'balanced': {'label':'バランス','subjects':set(),'reason':'全分野をバランスよく回すために選びました。'},
 }
+NOTE_TOPIC_KEYWORDS=[
+    ('SUP-RESP',{'呼吸','換気','肺胞','酸素','co2','二酸化炭素','peep','fio2','人工呼吸'}),
+    ('SUP-HD',{'透析','除水','拡散','限外濾過','膜','シャント'}),
+    ('SUP-ECC',{'人工心肺','体外循環','act','ヘパリン','遠心ポンプ','人工肺'}),
+    ('SAFE-ELEC',{'漏れ電流','接地','ミクロショック','電撃','安全'}),
+    ('EEE-CIR',{'電圧','電流','抵抗','オーム','電力','回路'}),
+    ('EEE-SIG',{'周波数','交流','コンデンサ','リアクタンス','インダクタンス'}),
+    ('MECH-FLUID',{'圧力','流量','半径','粘度','流体'}),
+    ('MEAS-SPO2',{'spo2','パルスオキシメータ','赤外光','脈波','酸素飽和度'}),
+    ('CLIN-PATH',{'ショック','心不全','腎不全','病態','肺うっ血'}),
+    ('MED-BIO',{'代謝','血糖','インスリン','ホルモン','アシドーシス'}),
+    ('MED-ANAT',{'心臓','血圧','血液','腎','肺','神経','解剖','生理'}),
+]
 
 def authenticate_user(email:str,password:str,db_path:Path|str=DB_PATH):
     from .security import verify_password
@@ -283,6 +296,104 @@ def get_admin_quality_summary(db_path:Path|str=DB_PATH):
         quality='blocked' if any('権利' in x for x in issues) else ('needs_review' if issues else 'ready')
         counts[quality]+=1;items.append({'id':r['id'],'question_type':r['question_type'],'status':r['status'],'permission_status':r['permission_status'],'quality_status':quality,'issues':issues,'question_text':r['question_text']})
     return {'counts':counts,'items':items}
+
+def create_student_note(user_id:int,title:str,content:str,source_type:str='manual_note',db_path:Path|str=DB_PATH)->int:
+    title=(title or '').strip() or '無題ノート'
+    content=(content or '').strip()
+    if len(content)<20:raise ValueError('ノート本文は20文字以上入力してください。')
+    if len(content)>20000:raise ValueError('v0.4.1ではノート本文は20,000文字以内です。')
+    return execute('INSERT INTO student_notes(user_id,title,content,source_type,created_at,updated_at) VALUES(?,?,?,?,?,?)',(user_id,title,content,source_type,utc_now(),utc_now()),db_path)
+
+def list_student_notes(user_id:int,db_path:Path|str=DB_PATH):
+    return [dict(r) for r in fetch_all('''SELECT n.*,COUNT(q.id) generated_question_count FROM student_notes n LEFT JOIN note_generated_questions q ON q.note_id=n.id WHERE n.user_id=? GROUP BY n.id ORDER BY n.created_at DESC''',(user_id,),db_path)]
+
+def _note_topic(content:str)->str:
+    lowered=content.lower()
+    best=('MED-ANAT',0)
+    for topic,words in NOTE_TOPIC_KEYWORDS:
+        score=sum(1 for word in words if word in lowered)
+        if score>best[1]:best=(topic,score)
+    return best[0]
+
+def _important_sentences(content:str,count:int)->list[str]:
+    parts=[p.strip(' ・\n\t') for p in re.split(r'[。．\n]+',content) if p.strip()]
+    def score(sentence:str):
+        keywords=['重要','必要','注意','原因','目的','主','低下','上昇','リスク','管理','設定','評価','確認']
+        return len(sentence)+sum(80 for k in keywords if k in sentence)
+    return sorted(parts,key=score,reverse=True)[:max(1,count)]
+
+def _note_question(sentence:str,topic_code:str,index:int)->dict[str,Any]:
+    clean=sentence[:120]
+    choices=['ノート本文の重要点として正しい','似た用語だが本文の主旨と異なる','原因と結果を逆にしている','別分野の知識を混同している','本文では判断できない内容を断定している']
+    explanations=[
+        f'本文では「{clean}」が重要点として扱われています。',
+        '似た語を選んでいても、本文の主張・条件と一致していません。',
+        '因果関係を逆にすると、臨床判断や装置設定を誤りやすくなります。',
+        '近い領域の知識でも、本問の本文で問われている分野とは異なります。',
+        'ノートに根拠がない断定は、復習問題では正答にしません。',
+    ]
+    return {
+        'question_type':'single',
+        'question_text':f'ノートAI問題{index}: 次のメモの要点として最も適切なのはどれか。「{clean}」',
+        'choices':choices,
+        'correct_code':'1',
+        'choice_explanations':explanations,
+        'explanation':f'この問題はあなたのノートから生成しました。重要と判断した文は「{clean}」です。既存の国家試験問題ではなく、復習用のオリジナル問題です。',
+        'topic_code':topic_code,
+    }
+
+def generate_note_questions(user_id:int,note_id:int,count:int=5,db_path:Path|str=DB_PATH):
+    note=fetch_one('SELECT * FROM student_notes WHERE id=? AND user_id=?',(note_id,user_id),db_path)
+    if not note:raise ValueError('ノートが見つかりません。')
+    count=max(1,min(int(count or 5),10))
+    topic=_note_topic(note['content'])
+    sentences=_important_sentences(note['content'],count)
+    created=[]
+    with connect(db_path) as conn:
+        for i,sentence in enumerate(sentences,1):
+            draft=_note_question(sentence,topic,i)
+            exists=conn.execute('SELECT id FROM note_generated_questions WHERE note_id=? AND question_text=?',(note_id,draft['question_text'])).fetchone()
+            if exists:
+                created.append(dict(conn.execute('SELECT * FROM note_generated_questions WHERE id=?',(exists['id'],)).fetchone()))
+                continue
+            qid=conn.execute('''INSERT INTO note_generated_questions(note_id,user_id,question_type,question_text,choices,correct_code,choice_explanations,explanation,topic_code,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,'active',?)''',(note_id,user_id,draft['question_type'],draft['question_text'],json.dumps(draft['choices'],ensure_ascii=False),draft['correct_code'],json.dumps(draft['choice_explanations'],ensure_ascii=False),draft['explanation'],draft['topic_code'],utc_now())).lastrowid
+            created.append(dict(conn.execute('SELECT * FROM note_generated_questions WHERE id=?',(qid,)).fetchone()))
+    return {'note_id':note_id,'generated_count':len(created),'questions':[format_note_question(q,answered=False) for q in created]}
+
+def format_note_question(row:dict|Any,answered:bool=False,include_answer:bool=False):
+    q=dict(row)
+    choices=json.loads(q.pop('choices'))
+    explanations=json.loads(q.pop('choice_explanations'))
+    q['choices']=[{'choice_code':str(i+1),'choice_text':text,'display_order':i+1} for i,text in enumerate(choices)]
+    q['answered']=answered
+    if include_answer:
+        q['correct_code']=q.get('correct_code','1')
+        q['choice_feedback']=[{**choice,'is_correct':choice['choice_code']==q['correct_code'],'explanation':explanations[i] if i<len(explanations) else ''} for i,choice in enumerate(q['choices'])]
+    else:
+        q.pop('correct_code',None);q.pop('explanation',None)
+    return q
+
+def list_note_questions(user_id:int,note_id:int,db_path:Path|str=DB_PATH):
+    note=fetch_one('SELECT id FROM student_notes WHERE id=? AND user_id=?',(note_id,user_id),db_path)
+    if not note:raise ValueError('ノートが見つかりません。')
+    rows=fetch_all('''SELECT q.*,EXISTS(SELECT 1 FROM note_question_answers a WHERE a.user_id=? AND a.note_question_id=q.id) answered FROM note_generated_questions q WHERE q.user_id=? AND q.note_id=? AND q.status='active' ORDER BY q.id''',(user_id,user_id,note_id),db_path)
+    return [format_note_question(r,answered=bool(r['answered'])) for r in rows]
+
+def get_note_question(user_id:int,question_id:int,db_path:Path|str=DB_PATH):
+    row=fetch_one("SELECT * FROM note_generated_questions WHERE id=? AND user_id=? AND status='active'",(question_id,user_id),db_path)
+    if not row:raise ValueError('ノート問題が見つかりません。')
+    return format_note_question(row)
+
+def answer_note_question(user_id:int,question_id:int,selected_code:str,confidence:str,seconds:int,db_path:Path|str=DB_PATH):
+    row=fetch_one("SELECT * FROM note_generated_questions WHERE id=? AND user_id=? AND status='active'",(question_id,user_id),db_path)
+    if not row:raise ValueError('ノート問題が見つかりません。')
+    selected=(selected_code or '').strip()
+    if not selected:raise ValueError('選択肢を選んでください。')
+    correct=selected==row['correct_code']
+    execute('INSERT INTO note_question_answers(user_id,note_question_id,selected_code,is_correct,confidence_level,response_time_seconds,answered_at) VALUES(?,?,?,?,?,?,?)',(user_id,question_id,selected,int(correct),confidence,max(0,int(seconds)),utc_now()),db_path)
+    q=format_note_question(row,include_answer=True)
+    for choice in q['choice_feedback']:choice['selected']=choice['choice_code']==selected
+    return {'is_correct':correct,'question':q}
 
 def start_diagnostic(user_id:int,question_count:int=30,db_path:Path|str=DB_PATH):
     old=fetch_one("SELECT * FROM diagnostic_sessions WHERE user_id=? AND status='in_progress' ORDER BY id DESC LIMIT 1",(user_id,),db_path)

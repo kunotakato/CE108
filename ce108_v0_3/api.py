@@ -12,12 +12,15 @@ from ce108.database import execute, utc_now
 from ce108.security import create_access_token, decode_access_token, verify_line_signature
 from ce108.seed import seed_database
 from ce108.services import (
+    answer_note_question,
     answer_diagnostic,
     assignment_results_csv,
     authenticate_user,
+    create_student_note,
     create_assignment,
     diagnostic_result,
     generate_daily_plan,
+    generate_note_questions,
     get_focus_plan,
     get_diagnostic_state,
     get_admin_quality_summary,
@@ -25,14 +28,17 @@ from ce108.services import (
     get_question,
     get_learning_summary,
     get_mastery_report,
+    get_note_question,
     get_review_queue,
     get_student_summary_for_teacher,
     get_teacher_support_summary,
     get_user,
     get_study_strategy,
     list_assignment_results,
+    list_note_questions,
     list_questions,
     list_students_for_teacher,
+    list_student_notes,
     public_question,
     record_answer,
     add_exam_event,
@@ -111,6 +117,19 @@ class ScoreRecordRequest(BaseModel):
     afternoon_score: float | None = None
     subject_scores: dict[str, float] = Field(default_factory=dict)
     memo: str = ''
+
+class NoteRequest(BaseModel):
+    title: str = '無題ノート'
+    content: str = Field(min_length=20, max_length=20000)
+    source_type: str = 'manual_note'
+
+class NoteGenerateRequest(BaseModel):
+    count: int = Field(default=5, ge=1, le=10)
+
+class NoteAnswerRequest(BaseModel):
+    selected_code: str
+    confidence: str = 'たぶん分かる'
+    response_time_seconds: int = Field(default=0, ge=0)
 
 def current_user(token: Annotated[str, Depends(oauth)]):
     try:
@@ -214,6 +233,45 @@ def study_exam_event(req: ExamEventRequest, user=Depends(require_role('student')
 def study_score(req: ScoreRecordRequest, user=Depends(require_role('student'))):
     try:
         return add_score_record(user['id'], req.score_type, req.title, req.taken_at, req.total_score, req.max_score, req.subject_scores, req.morning_score, req.afternoon_score, req.memo)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+@app.get('/api/notes')
+def notes(user=Depends(require_role('student'))):
+    return list_student_notes(user['id'])
+
+@app.post('/api/notes')
+def note_create(req: NoteRequest, user=Depends(require_role('student'))):
+    try:
+        return {'note_id': create_student_note(user['id'], req.title, req.content, req.source_type)}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+@app.post('/api/notes/{note_id}/generate')
+def note_generate(note_id: int, req: NoteGenerateRequest, user=Depends(require_role('student'))):
+    try:
+        return generate_note_questions(user['id'], note_id, req.count)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+@app.get('/api/notes/{note_id}/questions')
+def note_questions(note_id: int, user=Depends(require_role('student'))):
+    try:
+        return list_note_questions(user['id'], note_id)
+    except Exception as e:
+        raise HTTPException(404, str(e))
+
+@app.get('/api/note-questions/{question_id}')
+def note_question(question_id: int, user=Depends(require_role('student'))):
+    try:
+        return get_note_question(user['id'], question_id)
+    except Exception as e:
+        raise HTTPException(404, str(e))
+
+@app.post('/api/note-questions/{question_id}/answer')
+def note_answer(question_id: int, req: NoteAnswerRequest, user=Depends(require_role('student'))):
+    try:
+        return answer_note_question(user['id'], question_id, req.selected_code, req.confidence, req.response_time_seconds)
     except Exception as e:
         raise HTTPException(400, str(e))
 

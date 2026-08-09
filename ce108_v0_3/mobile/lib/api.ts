@@ -7,11 +7,13 @@ import type {
   LearningSummary,
   LoginResponse,
   MasteryRow,
+  NoteQuestion,
   Question,
   ReviewQueue,
   ScoreRecordPayload,
   StudyMode,
-  StudyStrategy
+  StudyStrategy,
+  StudentNote
 } from "./types";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -115,6 +117,34 @@ export async function addExamEvent(token: string, payload: { event_type: "mock" 
 
 export async function addScoreRecord(token: string, payload: ScoreRecordPayload) {
   return apiFetch<{ score_id: number }>("/api/study/scores", {
+    token,
+    method: "POST",
+    body: payload
+  });
+}
+
+export async function getNotes(token: string) {
+  return apiFetch<StudentNote[]>("/api/notes", { token });
+}
+
+export async function createNote(token: string, payload: { title: string; content: string; source_type?: string }) {
+  return apiFetch<{ note_id: number }>("/api/notes", {
+    token,
+    method: "POST",
+    body: payload
+  });
+}
+
+export async function generateNoteQuestions(token: string, noteId: number, count = 5) {
+  return apiFetch<{ note_id: number; generated_count: number; questions: NoteQuestion[] }>(`/api/notes/${noteId}/generate`, {
+    token,
+    method: "POST",
+    body: { count }
+  });
+}
+
+export async function answerNoteQuestion(token: string, questionId: number, payload: { selected_code: string; confidence: string; response_time_seconds: number }) {
+  return apiFetch<{ is_correct: boolean; question: NoteQuestion }>(`/api/note-questions/${questionId}/answer`, {
     token,
     method: "POST",
     body: payload

@@ -209,3 +209,30 @@ export type StudyStrategy = {
   strong_subjects: RadarSubject[];
   weak_topics: MasteryRow[];
 };
+
+export type StudentNote = {
+  id: number;
+  user_id: number;
+  title: string;
+  content: string;
+  source_type: string;
+  created_at: string;
+  updated_at: string;
+  generated_question_count: number;
+};
+
+export type NoteQuestion = {
+  id: number;
+  note_id: number;
+  user_id: number;
+  question_type: "single";
+  question_text: string;
+  choices: Choice[];
+  topic_code: string;
+  status: string;
+  created_at: string;
+  answered?: boolean;
+  explanation?: string;
+  correct_code?: string;
+  choice_feedback?: Array<Choice & { is_correct: boolean; selected?: boolean; explanation: string }>;
+};

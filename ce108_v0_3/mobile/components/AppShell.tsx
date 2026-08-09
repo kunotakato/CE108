@@ -21,6 +21,7 @@ export function AppShell({ title = "CE108", children, nav = true }: Props) {
         <nav className="bottom-nav" aria-label="主要メニュー">
           <Link href="/home">ホーム</Link>
           <Link href="/study">今日の5問</Link>
+          <Link href="/notes">ノートAI</Link>
           <Link href="/strategy">戦略</Link>
           <Link href="/reviews">復習</Link>
         </nav>
