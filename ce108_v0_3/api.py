@@ -18,6 +18,7 @@ from ce108.services import (
     create_assignment,
     diagnostic_result,
     generate_daily_plan,
+    get_focus_plan,
     get_diagnostic_state,
     get_admin_quality_summary,
     get_daily_status,
@@ -28,12 +29,16 @@ from ce108.services import (
     get_student_summary_for_teacher,
     get_teacher_support_summary,
     get_user,
+    get_study_strategy,
     list_assignment_results,
     list_questions,
     list_students_for_teacher,
     public_question,
     record_answer,
+    add_exam_event,
+    add_score_record,
     save_beta_feedback,
+    set_target_exam_date,
     start_diagnostic,
 )
 
@@ -85,6 +90,26 @@ class BetaFeedbackRequest(BaseModel):
     message: str = Field(min_length=3, max_length=2000)
     page_url: str | None = None
     user_agent: str | None = None
+
+class TargetExamDateRequest(BaseModel):
+    target_exam_date: str
+
+class ExamEventRequest(BaseModel):
+    event_type: str
+    title: str
+    event_date: str
+    memo: str = ''
+
+class ScoreRecordRequest(BaseModel):
+    score_type: str
+    title: str
+    taken_at: str
+    total_score: float = Field(ge=0)
+    max_score: float = Field(gt=0)
+    morning_score: float | None = None
+    afternoon_score: float | None = None
+    subject_scores: dict[str, float] = Field(default_factory=dict)
+    memo: str = ''
 
 def current_user(token: Annotated[str, Depends(oauth)]):
     try:
@@ -145,6 +170,10 @@ def answer(qid: int, req: AnswerRequest, user=Depends(require_role('student'))):
 def today(user=Depends(require_role('student'))):
     return generate_daily_plan(user['id'])
 
+@app.get('/api/study/focus')
+def study_focus(mode: str = 'balanced', count: int = 5, user=Depends(require_role('student'))):
+    return get_focus_plan(user['id'], mode=mode, count=count)
+
 @app.get('/api/study/daily-status')
 def daily_status(user=Depends(require_role('student'))):
     return get_daily_status(user['id'])
@@ -161,6 +190,31 @@ def study_summary(user=Depends(require_role('student'))):
 def study_mastery(limit: int = 3, user=Depends(require_role('student'))):
     rows = get_mastery_report(user['id'])
     return rows[:max(1, min(limit, 10))]
+
+@app.get('/api/study/strategy')
+def study_strategy(user=Depends(require_role('student'))):
+    return get_study_strategy(user['id'])
+
+@app.post('/api/study/target-exam')
+def study_target_exam(req: TargetExamDateRequest, user=Depends(require_role('student'))):
+    try:
+        return set_target_exam_date(user['id'], req.target_exam_date)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+@app.post('/api/study/exam-events')
+def study_exam_event(req: ExamEventRequest, user=Depends(require_role('student'))):
+    try:
+        return add_exam_event(user['id'], req.event_type, req.title, req.event_date, req.memo)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+@app.post('/api/study/scores')
+def study_score(req: ScoreRecordRequest, user=Depends(require_role('student'))):
+    try:
+        return add_score_record(user['id'], req.score_type, req.title, req.taken_at, req.total_score, req.max_score, req.subject_scores, req.morning_score, req.afternoon_score, req.memo)
+    except Exception as e:
+        raise HTTPException(400, str(e))
 
 @app.post('/api/beta/feedback')
 def beta_feedback(req: BetaFeedbackRequest, user=Depends(require_role('student'))):

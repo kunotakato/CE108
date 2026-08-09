@@ -33,6 +33,8 @@ export type DailyPlanItem = {
 export type DailyPlan = {
   id: number;
   plan_date: string;
+  mode?: "medical" | "engineering" | "balanced";
+  mode_label?: string;
   recommended_count: number;
   estimated_minutes: number;
   status: string;
@@ -149,4 +151,51 @@ export type FeedbackPayload = {
   message: string;
   page_url?: string;
   user_agent?: string;
+};
+
+export type StudyMode = "medical" | "engineering" | "balanced";
+
+export type RadarSubject = {
+  subject_code: string;
+  subject_name: string;
+  value: number;
+  accuracy: number;
+  mock_score?: number | null;
+  answers: number;
+};
+
+export type ExamEvent = {
+  id: number;
+  event_type: "mock" | "past_exam" | "real_exam";
+  title: string;
+  event_date: string;
+  status: string;
+  memo?: string | null;
+};
+
+export type ScoreRecordPayload = {
+  score_type: "mock" | "past_exam";
+  title: string;
+  taken_at: string;
+  total_score: number;
+  max_score: number;
+  morning_score?: number | null;
+  afternoon_score?: number | null;
+  subject_scores: Record<string, number>;
+  memo?: string;
+};
+
+export type StudyStrategy = {
+  target_exam_date?: string | null;
+  days_until_exam?: number | null;
+  phase: "undecided" | "normal" | "push" | "final";
+  phase_label: string;
+  recommended_mode: StudyMode;
+  recommendation: string;
+  events: ExamEvent[];
+  latest_score?: Record<string, unknown> | null;
+  radar: RadarSubject[];
+  weak_subjects: RadarSubject[];
+  strong_subjects: RadarSubject[];
+  weak_topics: MasteryRow[];
 };

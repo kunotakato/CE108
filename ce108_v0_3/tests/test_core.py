@@ -16,6 +16,7 @@ from ce108.services import (
     authenticate_user,
     check_answer,
     generate_daily_plan,
+    get_focus_plan,
     get_admin_quality_summary,
     get_daily_status,
     get_diagnostic_state,
@@ -24,9 +25,13 @@ from ce108.services import (
     get_review_queue,
     get_student_summary_for_teacher,
     get_teacher_support_summary,
+    get_study_strategy,
     record_answer,
+    add_exam_event,
+    add_score_record,
     save_beta_feedback,
     schedule_review,
+    set_target_exam_date,
     start_diagnostic,
 )
 
@@ -90,6 +95,24 @@ class TestCore(unittest.TestCase):
     def test_daily_plan_generation(self):
         plan = generate_daily_plan(self.student['id'], count=5, db_path=self.db)
         self.assertEqual(len(plan['items']), 5)
+
+    def test_focus_plan_modes(self):
+        medical = get_focus_plan(self.student['id'], 'medical', 5, self.db)
+        engineering = get_focus_plan(self.student['id'], 'engineering', 5, self.db)
+        self.assertEqual(medical['mode'], 'medical')
+        self.assertTrue(all(item['subject_name'] in {'医学概論・基礎医学', '臨床医学総論'} for item in medical['items']))
+        self.assertEqual(engineering['mode'], 'engineering')
+        self.assertTrue(engineering['items'])
+
+    def test_exam_strategy_records_scores_and_events(self):
+        set_target_exam_date(self.student['id'], (date.today() + timedelta(days=120)).isoformat(), self.db)
+        add_exam_event(self.student['id'], 'mock', '第1回模試', (date.today() + timedelta(days=30)).isoformat(), db_path=self.db)
+        add_score_record(self.student['id'], 'mock', '第1回模試', date.today().isoformat(), 120, 180, {'医学概論・基礎医学': 70, '臨床医学総論': 65}, db_path=self.db)
+        strategy = get_study_strategy(self.student['id'], self.db)
+        self.assertEqual(strategy['phase'], 'normal')
+        self.assertEqual(strategy['recommended_mode'], 'medical')
+        self.assertTrue(strategy['events'])
+        self.assertTrue(strategy['radar'])
 
     def test_daily_status_concurrent_generation_is_stable(self):
         with ThreadPoolExecutor(max_workers=4) as executor:
@@ -209,6 +232,20 @@ class TestApi(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn('streak_days', res.json())
         self.assertIn('next_action', res.json())
+
+    def test_focus_and_strategy_api(self):
+        token = self._token()
+        res = self.client.get('/api/study/focus?mode=medical&count=5', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()['mode'], 'medical')
+        self.assertLessEqual(len(res.json()['items']), 5)
+        res = self.client.post('/api/study/target-exam', headers={'Authorization': f'Bearer {token}'}, json={'target_exam_date': (date.today() + timedelta(days=100)).isoformat()})
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('radar', res.json())
+        res = self.client.post('/api/study/exam-events', headers={'Authorization': f'Bearer {token}'}, json={'event_type': 'mock', 'title': '公開模試', 'event_date': (date.today() + timedelta(days=20)).isoformat()})
+        self.assertEqual(res.status_code, 200)
+        res = self.client.post('/api/study/scores', headers={'Authorization': f'Bearer {token}'}, json={'score_type': 'mock', 'title': '公開模試', 'taken_at': date.today().isoformat(), 'total_score': 110, 'max_score': 180, 'subject_scores': {'医学概論・基礎医学': 62}})
+        self.assertEqual(res.status_code, 200)
 
     def test_review_queue_api(self):
         token = self._token()

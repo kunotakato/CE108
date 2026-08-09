@@ -8,7 +8,10 @@ import type {
   LoginResponse,
   MasteryRow,
   Question,
-  ReviewQueue
+  ReviewQueue,
+  ScoreRecordPayload,
+  StudyMode,
+  StudyStrategy
 } from "./types";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
@@ -70,6 +73,10 @@ export async function getToday(token: string) {
   return apiFetch<DailyPlan>("/api/study/today", { token });
 }
 
+export async function getFocusPlan(token: string, mode: StudyMode, count = 5) {
+  return apiFetch<DailyPlan>(`/api/study/focus?mode=${mode}&count=${count}`, { token });
+}
+
 export async function getDailyStatus(token: string) {
   return apiFetch<DailyStatus>("/api/study/daily-status", { token });
 }
@@ -84,6 +91,34 @@ export async function getSummary(token: string) {
 
 export async function getMastery(token: string, limit = 3) {
   return apiFetch<MasteryRow[]>(`/api/study/mastery?limit=${limit}`, { token });
+}
+
+export async function getStrategy(token: string) {
+  return apiFetch<StudyStrategy>("/api/study/strategy", { token });
+}
+
+export async function saveTargetExamDate(token: string, target_exam_date: string) {
+  return apiFetch<StudyStrategy>("/api/study/target-exam", {
+    token,
+    method: "POST",
+    body: { target_exam_date }
+  });
+}
+
+export async function addExamEvent(token: string, payload: { event_type: "mock" | "past_exam" | "real_exam"; title: string; event_date: string; memo?: string }) {
+  return apiFetch<{ event_id: number }>("/api/study/exam-events", {
+    token,
+    method: "POST",
+    body: payload
+  });
+}
+
+export async function addScoreRecord(token: string, payload: ScoreRecordPayload) {
+  return apiFetch<{ score_id: number }>("/api/study/scores", {
+    token,
+    method: "POST",
+    body: payload
+  });
 }
 
 export function assertQuestionSafe(question: Record<string, unknown>) {

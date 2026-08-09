@@ -7,6 +7,11 @@ from .config import DB_PATH
 from .database import connect, execute, fetch_all, fetch_one, utc_now
 
 CONFIDENCE_VALUES={'確実に分かる':1.0,'たぶん分かる':0.82,'迷った':0.58,'勘で答えた':0.35}
+FOCUS_MODES={
+    'medical': {'label':'医学重点','subjects':{'MED','CLIN'},'reason':'医学・臨床医学を8割へ近づけるために選びました。'},
+    'engineering': {'label':'工学重点','subjects':{'EEE','MECH','MAT','SUP','THER','MEAS','SAFE'},'reason':'工学・装置・安全分野を固めるために選びました。'},
+    'balanced': {'label':'バランス','subjects':set(),'reason':'全分野をバランスよく回すために選びました。'},
+}
 
 def authenticate_user(email:str,password:str,db_path:Path|str=DB_PATH):
     from .security import verify_password
@@ -100,11 +105,81 @@ def get_daily_plan(user_id:int,plan_date:str|None=None,db_path:Path|str=DB_PATH)
     items=fetch_all('''SELECT i.*,q.question_text,q.question_type,q.importance,s.name subject_name,t.name topic_name,EXISTS(SELECT 1 FROM answer_history a WHERE a.user_id=? AND a.question_id=i.question_id AND date(a.answered_at)=? AND a.answer_mode='daily') completed FROM daily_study_plan_items i JOIN questions q ON q.id=i.question_id LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary' LEFT JOIN topics t ON t.id=m.topic_id LEFT JOIN subjects s ON s.id=t.subject_id WHERE i.plan_id=? ORDER BY i.display_order''',(user_id,plan_date,p['id']),db_path)
     d=dict(p);d['items']=[dict(r) for r in items];return d
 
+def get_focus_plan(user_id:int,mode:str='balanced',count:int=5,db_path:Path|str=DB_PATH):
+    mode=mode if mode in FOCUS_MODES else 'balanced';cfg=FOCUS_MODES[mode];count=max(3,min(10,int(count or 5)))
+    params=[user_id]
+    where="WHERE q.status='published'"
+    if cfg['subjects']:
+        marks=','.join('?' for _ in cfg['subjects'])
+        where+=f" AND s.code IN ({marks})";params.extend(sorted(cfg['subjects']))
+    rows=[dict(r) for r in fetch_all(f'''SELECT q.id question_id,q.question_text,q.question_type,q.importance,q.frequency_score,s.name subject_name,s.code subject_code,t.name topic_name,COALESCE(m.mastery_score,0) mastery,EXISTS(SELECT 1 FROM answer_history a WHERE a.user_id=? AND a.question_id=q.id) answered FROM questions q JOIN question_topic_mappings tm ON tm.question_id=q.id AND tm.mapping_type='primary' JOIN topics t ON t.id=tm.topic_id JOIN subjects s ON s.id=t.subject_id LEFT JOIN user_topic_mastery m ON m.topic_id=t.id AND m.user_id=? {where} GROUP BY q.id ORDER BY answered ASC,((q.importance/5.0)*0.45 + MIN(1,q.frequency_score/3.0)*0.25 + (1-COALESCE(m.mastery_score,0)/100.0)*0.30) DESC,q.id LIMIT ?''',[user_id,*params,count],db_path)]
+    items=[]
+    for i,r in enumerate(rows,1):
+        typ='苦手' if float(r['mastery'] or 0)<40 else ('必達' if int(r['importance'])>=4 else '新規')
+        items.append({'id':i,'plan_id':0,'question_id':r['question_id'],'item_type':typ,'display_order':i,'reason':cfg['reason'],'question_text':r['question_text'],'question_type':r['question_type'],'importance':r['importance'],'subject_name':r['subject_name'],'topic_name':r['topic_name'],'completed':0})
+    return {'id':0,'plan_date':date.today().isoformat(),'mode':mode,'mode_label':cfg['label'],'recommended_count':len(items),'estimated_minutes':max(5,round(len(items)*2.5)),'status':'not_started','items':items}
+
 def get_mastery_report(user_id:int,db_path:Path|str=DB_PATH):
     return [dict(r) for r in fetch_all('''SELECT s.name subject_name,t.name topic_name,COALESCE(m.mastery_score,0) mastery_score,COALESCE(m.retention_score,0) retention_score,COALESCE(m.total_answers,0) total_answers,COALESCE(m.correct_answers,0) correct_answers,m.last_answered_at FROM topics t JOIN subjects s ON s.id=t.subject_id LEFT JOIN user_topic_mastery m ON m.topic_id=t.id AND m.user_id=? ORDER BY mastery_score,s.display_order,t.display_order''',(user_id,),db_path)]
 
 def get_learning_summary(user_id:int,db_path:Path|str=DB_PATH):
     r=fetch_one('SELECT COUNT(*) total,COALESCE(SUM(is_correct),0) correct,COALESCE(AVG(response_time_seconds),0) avg_seconds FROM answer_history WHERE user_id=?',(user_id,),db_path);due=fetch_one("SELECT COUNT(*) due FROM review_schedules WHERE user_id=? AND status='pending' AND scheduled_date<=?",(user_id,date.today().isoformat()),db_path);total=int(r['total']);correct=int(r['correct']);return {'total':total,'correct':correct,'accuracy':round(correct/total*100,1) if total else 0,'avg_seconds':round(r['avg_seconds'],1),'due_reviews':due['due']}
+
+def set_target_exam_date(user_id:int,target_exam_date:str,db_path:Path|str=DB_PATH):
+    datetime.fromisoformat(target_exam_date)
+    with connect(db_path) as conn:
+        conn.execute('INSERT INTO student_exam_plans(user_id,target_exam_date,updated_at) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET target_exam_date=excluded.target_exam_date,updated_at=excluded.updated_at',(user_id,target_exam_date,utc_now()))
+    return get_study_strategy(user_id,db_path)
+
+def add_exam_event(user_id:int,event_type:str,title:str,event_date:str,memo:str='',db_path:Path|str=DB_PATH):
+    if event_type not in {'mock','past_exam','real_exam'}:raise ValueError('予定種別が不正です。')
+    if not title.strip():raise ValueError('予定名を入力してください。')
+    datetime.fromisoformat(event_date)
+    eid=execute("INSERT INTO exam_events(user_id,event_type,title,event_date,status,memo,created_at,updated_at) VALUES(?,?,?,?, 'scheduled',?,?,?)",(user_id,event_type,title.strip(),event_date,memo.strip() or None,utc_now(),utc_now()),db_path)
+    return {'event_id':eid}
+
+def add_score_record(user_id:int,score_type:str,title:str,taken_at:str,total_score:float,max_score:float,subject_scores:dict[str,float]|None=None,morning_score:float|None=None,afternoon_score:float|None=None,memo:str='',db_path:Path|str=DB_PATH):
+    if score_type not in {'mock','past_exam'}:raise ValueError('スコア種別が不正です。')
+    if not title.strip():raise ValueError('模試・過去問名を入力してください。')
+    datetime.fromisoformat(taken_at)
+    total_score=float(total_score);max_score=float(max_score)
+    if max_score<=0 or total_score<0 or total_score>max_score:raise ValueError('総合点と満点を確認してください。')
+    safe_scores={str(k):max(0,min(100,float(v))) for k,v in (subject_scores or {}).items() if str(k).strip()}
+    sid=execute('''INSERT INTO score_records(user_id,score_type,title,taken_at,total_score,max_score,morning_score,afternoon_score,subject_scores,memo,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)''',(user_id,score_type,title.strip(),taken_at,total_score,max_score,morning_score,afternoon_score,json.dumps(safe_scores,ensure_ascii=False),memo.strip() or None,utc_now()),db_path)
+    return {'score_id':sid}
+
+def _days_until(target:str|None)->int|None:
+    if not target:return None
+    return (datetime.fromisoformat(target).date()-date.today()).days
+
+def _phase(days:int|None)->str:
+    if days is None:return 'undecided'
+    if days<=30:return 'final'
+    if days<=90:return 'push'
+    return 'normal'
+
+def get_study_strategy(user_id:int,db_path:Path|str=DB_PATH):
+    plan=fetch_one('SELECT * FROM student_exam_plans WHERE user_id=?',(user_id,),db_path)
+    events=[dict(r) for r in fetch_all("SELECT * FROM exam_events WHERE user_id=? ORDER BY event_date LIMIT 10",(user_id,),db_path)]
+    latest=fetch_one('SELECT * FROM score_records WHERE user_id=? ORDER BY taken_at DESC,id DESC LIMIT 1',(user_id,),db_path)
+    mastery=get_mastery_report(user_id,db_path)
+    subject_rows=fetch_all('''SELECT s.name subject_name,s.code subject_code,COALESCE(SUM(m.correct_answers),0) correct,COALESCE(SUM(m.total_answers),0) total,COALESCE(AVG(m.mastery_score),0) mastery FROM subjects s LEFT JOIN topics t ON t.subject_id=s.id LEFT JOIN user_topic_mastery m ON m.topic_id=t.id AND m.user_id=? GROUP BY s.id ORDER BY s.display_order''',(user_id,),db_path)
+    score_subjects=json.loads(latest['subject_scores']) if latest and latest['subject_scores'] else {}
+    radar=[]
+    for r in subject_rows:
+        answers=int(r['total'] or 0);accuracy=round(int(r['correct'] or 0)/answers*100,1) if answers else 0
+        score_rate=score_subjects.get(r['subject_name'],score_subjects.get(r['subject_code']))
+        value=round((float(score_rate)*0.65+accuracy*0.35),1) if score_rate is not None else (round(float(r['mastery'] or 0),1) if answers else 0)
+        radar.append({'subject_code':r['subject_code'],'subject_name':r['subject_name'],'value':value,'accuracy':accuracy,'mock_score':score_rate,'answers':answers})
+    days=_days_until(plan['target_exam_date'] if plan else None);phase=_phase(days)
+    weak=sorted(radar,key=lambda x:x['value'])[:3];strong=sorted(radar,key=lambda x:x['value'],reverse=True)[:3]
+    recommended='balanced'
+    med=sum(x['value'] for x in radar if x['subject_code'] in {'MED','CLIN'})/max(1,len([x for x in radar if x['subject_code'] in {'MED','CLIN'}]))
+    eng=sum(x['value'] for x in radar if x['subject_code'] not in {'MED','CLIN'})/max(1,len([x for x in radar if x['subject_code'] not in {'MED','CLIN'}]))
+    if phase=='final':recommended='medical' if med>=eng else 'engineering'
+    elif med<75:recommended='medical'
+    elif eng<75:recommended='engineering'
+    return {'target_exam_date':plan['target_exam_date'] if plan else None,'days_until_exam':days,'phase':phase,'phase_label':{'undecided':'試験日未設定','normal':'通常期','push':'追い込み期','final':'直前期'}[phase],'recommended_mode':recommended,'recommendation':('直前期は得意分野と頻出分野を固めましょう。' if phase=='final' else '苦手分野を優先して底上げしましょう。'),'events':events,'latest_score':dict(latest) if latest else None,'radar':radar,'weak_subjects':weak,'strong_subjects':strong,'weak_topics':mastery[:5]}
 
 def list_due_reviews(user_id:int,db_path:Path|str=DB_PATH):
     return [dict(r) for r in fetch_all('''SELECT r.scheduled_date,r.priority,q.id question_id,q.question_text,s.name subject_name,t.name topic_name FROM review_schedules r JOIN questions q ON q.id=r.question_id LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary' LEFT JOIN topics t ON t.id=m.topic_id LEFT JOIN subjects s ON s.id=t.subject_id WHERE r.user_id=? AND r.status='pending' ORDER BY r.scheduled_date,r.priority DESC''',(user_id,),db_path)]

@@ -1,21 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { BottomAction } from "@/components/BottomAction";
 import { ChoiceCard } from "@/components/ChoiceCard";
 import { ConfidenceSelector } from "@/components/ConfidenceSelector";
 import { ProgressHeader } from "@/components/ProgressHeader";
 import { EmptyState, ErrorState, LoadingState } from "@/components/StateViews";
-import { getQuestion, getToday, submitAnswer } from "@/lib/api";
+import { getFocusPlan, getQuestion, getToday, submitAnswer } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { addSessionAnswer, getSession, resetSession } from "@/lib/studySession";
-import type { AnswerResult, DailyPlan, DailyPlanItem, Question } from "@/lib/types";
+import type { AnswerResult, DailyPlan, DailyPlanItem, Question, StudyMode } from "@/lib/types";
 
-export default function StudyPage() {
+function StudyPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const mode = (searchParams.get("mode") || "daily") as StudyMode | "daily";
   const startedAt = useRef(Date.now());
   const [plan, setPlan] = useState<DailyPlan | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -32,7 +34,7 @@ export default function StudyPage() {
   const item: DailyPlanItem | undefined = items[currentIndex];
   const currentQuestionId = item?.question_id;
 
-  async function loadPlan() {
+  const loadPlan = useCallback(async function loadPlan() {
     const token = getToken();
     if (!token) {
       setError("ログイン情報が見つかりません。ログインし直してください。");
@@ -42,7 +44,7 @@ export default function StudyPage() {
     setLoading(true);
     setError("");
     try {
-      const today = await getToday(token);
+      const today = mode === "daily" ? await getToday(token) : await getFocusPlan(token, mode, 5);
       setPlan(today);
       if (getSession().answers.length === 0) resetSession();
     } catch (err) {
@@ -50,7 +52,7 @@ export default function StudyPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [mode]);
 
   async function loadQuestion(questionId: number) {
     const token = getToken();
@@ -73,7 +75,7 @@ export default function StudyPage() {
 
   useEffect(() => {
     void loadPlan();
-  }, []);
+  }, [loadPlan]);
 
   useEffect(() => {
     if (currentQuestionId) void loadQuestion(currentQuestionId);
@@ -137,7 +139,7 @@ export default function StudyPage() {
 
   if (loading && !question) {
     return (
-      <AppShell title="今日の5問" nav={false}>
+      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false}>
         <LoadingState />
       </AppShell>
     );
@@ -145,7 +147,7 @@ export default function StudyPage() {
 
   if (error && !question) {
     return (
-      <AppShell title="今日の5問" nav={false}>
+      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false}>
         <ErrorState message={error} onRetry={item ? () => loadQuestion(item.question_id) : loadPlan} />
         <Link className="link-button" href="/home">ホームへ戻る</Link>
       </AppShell>
@@ -154,7 +156,7 @@ export default function StudyPage() {
 
   if (!item || !question) {
     return (
-      <AppShell title="今日の5問" nav={false}>
+      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false}>
         <EmptyState message="今日の問題がありません。" />
         <BottomAction onClick={() => router.push("/home")}>ホームへ戻る</BottomAction>
       </AppShell>
@@ -162,7 +164,7 @@ export default function StudyPage() {
   }
 
   return (
-    <AppShell title="今日の5問" nav={false}>
+    <AppShell title={plan?.mode_label || "今日の5問"} nav={false}>
       <div className="stack">
         <ProgressHeader current={currentIndex + 1} total={items.length} />
         <section className="question-card stack">
@@ -222,5 +224,13 @@ export default function StudyPage() {
         {submitting ? "保存中" : result ? "回答済み" : "回答する"}
       </BottomAction>
     </AppShell>
+  );
+}
+
+export default function StudyPage() {
+  return (
+    <Suspense fallback={<AppShell title="今日の5問" nav={false}><LoadingState /></AppShell>}>
+      <StudyPageContent />
+    </Suspense>
   );
 }
