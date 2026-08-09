@@ -107,6 +107,21 @@ class TestCore(unittest.TestCase):
         plan = generate_daily_plan(self.student['id'], count=5, db_path=self.db)
         self.assertEqual(len(plan['items']), 5)
 
+    def test_seed_contains_expanded_original_questions_with_choice_explanations(self):
+        total = fetch_one('SELECT COUNT(*) total FROM questions', (), self.db)['total']
+        empty = fetch_one("SELECT COUNT(*) total FROM question_choices WHERE TRIM(COALESCE(explanation,''))=''", (), self.db)['total']
+        self.assertGreaterEqual(total, 49)
+        self.assertEqual(empty, 0)
+
+    def test_seed_adds_missing_questions_to_existing_database(self):
+        text = '血圧を規定する要素として最も基本的な組合せはどれか。'
+        with connect(self.db) as conn:
+            qid = conn.execute('SELECT id FROM questions WHERE question_text=?', (text,)).fetchone()['id']
+            conn.execute('DELETE FROM questions WHERE id=?', (qid,))
+        seed_database(self.db)
+        restored = fetch_one('SELECT id FROM questions WHERE question_text=?', (text,), self.db)
+        self.assertIsNotNone(restored)
+
     def test_focus_plan_modes(self):
         medical = get_focus_plan(self.student['id'], 'medical', 5, self.db)
         engineering = get_focus_plan(self.student['id'], 'engineering', 5, self.db)
