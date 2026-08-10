@@ -1,6 +1,6 @@
-# CE108 v0.4.1 Web Deployment Preparation
+# CE108 v0.4.2 Tester Readiness
 
-臨床工学技士国家試験対策のローカル実動プロトタイプです。v0.4では、学生が毎日使い続けるための日次学習体験、復習キュー、教員支援、管理者品質チェックを追加しています。v0.4.1では、外部URLで小規模β検証を行うためのWeb公開準備を追加しています。
+臨床工学技士国家試験対策のローカル実動プロトタイプです。v0.4では、学生が毎日使い続けるための日次学習体験、復習キュー、教員支援、管理者品質チェックを追加しています。v0.4.2では、最初の外部テスターに渡すためのアカウント発行、安全文言、ノートAI復習の注意、検収手順を整理しています。
 
 ## 実装済み
 
@@ -73,6 +73,14 @@
 - `docs/EXTERNAL_BETA_GUIDE.md`に外部βテスターへ共有する前の準備事項を追加
 - 学生モバイル画面からβフィードバックを送信可能
 - 同時アクセス時の日次プラン生成競合を修正
+
+### Tester Readiness v0.4.2
+- 管理者APIから外部βテスター学生を作成可能
+- `scripts/create_tester_account.py`でテスター学生を作成可能
+- モバイルログイン画面を発行アカウント前提に更新
+- ローカル検証時だけデモ学生入力ボタンを表示可能
+- ノートAI復習に個人情報・患者情報入力禁止と生成誤りの注意を表示
+- 外部テスター向けRunbookと検収レポートを追加
 
 ## 重要事項
 
@@ -160,6 +168,7 @@ GET  /api/teacher/assignments/{assignment_id}/results.csv
 GET  /api/admin/questions
 GET  /api/admin/quality
 POST /api/admin/questions
+POST /api/admin/tester-students
 POST /api/admin/questions/{qid}/approve
 POST /api/admin/questions/{qid}/unpublish
 ```
@@ -185,6 +194,17 @@ PUBLIC_BASE_URL=https://your-api.example.com
 NEXT_PUBLIC_API_BASE_URL=https://your-api.example.com
 ```
 
+外部βテスター用の学生アカウント作成:
+
+```bash
+python scripts/create_tester_account.py \
+  --email beta1@example.com \
+  --password replace-with-8-or-more-chars \
+  --display-name 外部β1
+```
+
+公開環境では、管理者API`POST /api/admin/tester-students`からも同じ学生アカウントを作成できます。
+
 詳細は次を参照してください。
 
 ```text
@@ -193,7 +213,7 @@ docs/RENDER_DEPLOYMENT.md
 docs/EXTERNAL_BETA_GUIDE.md
 ```
 
-## Mobile Alpha v0.3.5
+## Mobile v0.4.2
 
 学生がスマートフォンで毎日5問を解くためのNext.jsフロントエンドを`mobile/`に追加しています。教員・管理者画面は従来どおりStreamlitを利用します。
 

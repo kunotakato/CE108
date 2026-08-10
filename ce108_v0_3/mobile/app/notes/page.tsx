@@ -85,6 +85,7 @@ export default function NotesPage() {
           <p className="eyebrow">Notebook to quiz</p>
           <h1>自分のノートから、復習問題を作る。</h1>
           <p className="lead">CE108が重要そうな文を拾い、国家試験対策用のオリジナル問題に変換します。</p>
+          <p className="muted">外部βでは個人情報、患者情報、学校の非公開資料、支払い情報を入力しないでください。</p>
         </section>
         <section className="panel stack">
           <label className="field">
@@ -114,7 +115,7 @@ export default function NotesPage() {
           <button className="primary-button" disabled={!canGenerate} type="button" onClick={handleGenerate}>
             {loading ? "作成中" : "ノートから問題を作る"}
           </button>
-          <p className="muted">v0.4.1では外部AI APIを使わず、ローカルの重要文抽出で生成します。公式過去問ではなく復習用オリジナル問題です。</p>
+          <p className="muted">v0.4.2では外部AI APIを使わず、ローカルの重要文抽出で生成します。公式過去問ではなく復習用オリジナル問題です。生成内容は誤る可能性があるため、解説とノートを照合してください。</p>
         </section>
         {error ? <ErrorState message={error} /> : null}
         {questions.length ? (

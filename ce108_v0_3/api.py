@@ -16,6 +16,7 @@ from ce108.services import (
     answer_diagnostic,
     assignment_results_csv,
     authenticate_user,
+    create_beta_student,
     create_student_note,
     create_assignment,
     diagnostic_result,
@@ -53,7 +54,7 @@ async def lifespan(app: FastAPI):
     seed_database()
     yield
 
-app = FastAPI(title='CE108 API', version='0.4.1', lifespan=lifespan)
+app = FastAPI(title='CE108 API', version='0.4.2', lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
 oauth = OAuth2PasswordBearer(tokenUrl='/api/auth/login')
 
@@ -131,6 +132,14 @@ class NoteAnswerRequest(BaseModel):
     confidence: str = 'たぶん分かる'
     response_time_seconds: int = Field(default=0, ge=0)
 
+class BetaStudentRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=8)
+    display_name: str
+    grade: str = '4年'
+    school_name: str = 'CE108外部β'
+    target_exam_year: int | None = None
+
 def current_user(token: Annotated[str, Depends(oauth)]):
     try:
         payload = decode_access_token(token)
@@ -158,7 +167,7 @@ async def permission_error_handler(request: Request, exc: PermissionError):
 
 @app.get('/health')
 def health():
-    return {'status': 'ok', 'version': '0.4.1'}
+    return {'status': 'ok', 'version': '0.4.2'}
 
 @app.post('/api/auth/login')
 def login(form: Annotated[OAuth2PasswordRequestForm, Depends()]):
@@ -328,6 +337,10 @@ def admin_questions(limit: int = 500, user=Depends(require_role('admin'))):
 @app.get('/api/admin/quality')
 def admin_quality(user=Depends(require_role('admin'))):
     return get_admin_quality_summary()
+
+@app.post('/api/admin/tester-students')
+def admin_create_tester_student(req: BetaStudentRequest, user=Depends(require_role('admin'))):
+    return create_beta_student(req.email, req.password, req.display_name, req.grade, req.school_name, req.target_exam_year)
 
 @app.post('/api/admin/questions')
 def admin_create_question(req: AdminQuestionRequest, user=Depends(require_role('admin'))):

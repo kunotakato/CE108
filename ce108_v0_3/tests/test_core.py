@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from pathlib import Path
@@ -15,6 +16,7 @@ from ce108.services import (
     answer_diagnostic,
     authenticate_user,
     check_answer,
+    create_beta_student,
     generate_daily_plan,
     get_focus_plan,
     get_admin_quality_summary,
@@ -187,6 +189,19 @@ class TestCore(unittest.TestCase):
         self.assertEqual(saved['user_id'], self.student['id'])
         self.assertEqual(saved['rating'], 5)
 
+    def test_create_beta_student_can_login_and_is_assigned(self):
+        user = create_beta_student('beta1@example.com', 'tester1234', '外部β1', db_path=self.db)
+        logged_in = authenticate_user('beta1@example.com', 'tester1234', self.db)
+        membership = fetch_one('SELECT * FROM organization_memberships WHERE user_id=?', (user['id'],), self.db)
+        self.assertEqual(user['role'], 'student')
+        self.assertEqual(logged_in['id'], user['id'])
+        self.assertIsNotNone(membership)
+
+    def test_create_beta_student_rejects_duplicate_email(self):
+        create_beta_student('beta2@example.com', 'tester1234', '外部β2', db_path=self.db)
+        with self.assertRaises(ValueError):
+            create_beta_student('BETA2@example.com', 'tester1234', '外部β2 duplicate', db_path=self.db)
+
     def test_unconfirmed_question_cannot_be_published(self):
         with self.assertRaises(ValueError):
             create_question(self.admin['id'], 'single', '権利未確認の問題', 'MED-ANAT', ['A', 'B'], ['1'], None, None, '短', '標準', '詳細', 3, 2, 'checking', 'published', self.db)
@@ -341,6 +356,20 @@ class TestApi(unittest.TestCase):
     def test_admin_quality_api_forbidden_to_student(self):
         token = self._token()
         res = self.client.get('/api/admin/quality', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(res.status_code, 403)
+
+    def test_admin_can_create_tester_student_api(self):
+        token = self._token('admin@ce108.local')
+        email = f"api-beta-{uuid.uuid4().hex}@example.com"
+        res = self.client.post('/api/admin/tester-students', headers={'Authorization': f'Bearer {token}'}, json={'email': email, 'password': 'tester1234', 'display_name': 'API外部β'})
+        self.assertEqual(res.status_code, 200, res.text)
+        self.assertEqual(res.json()['role'], 'student')
+        login_res = self.client.post('/api/auth/login', data={'username': email, 'password': 'tester1234'})
+        self.assertEqual(login_res.status_code, 200, login_res.text)
+
+    def test_student_cannot_create_tester_student_api(self):
+        token = self._token()
+        res = self.client.post('/api/admin/tester-students', headers={'Authorization': f'Bearer {token}'}, json={'email': 'blocked-beta@example.com', 'password': 'tester1234', 'display_name': 'Blocked'})
         self.assertEqual(res.status_code, 403)
 
 

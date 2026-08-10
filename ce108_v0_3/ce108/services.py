@@ -35,6 +35,29 @@ def get_user(user_id:int,db_path:Path|str=DB_PATH):
     row=fetch_one('''SELECT u.id,u.email,u.line_user_id,u.role,u.status,p.display_name,p.school_name,p.grade,p.target_exam_year,p.daily_study_minutes,p.target_score,p.notification_time,p.diagnostic_completed FROM users u JOIN user_profiles p ON p.user_id=u.id WHERE u.id=?''',(user_id,),db_path)
     return dict(row) if row else None
 
+def create_beta_student(email:str,password:str,display_name:str,grade:str='4年',school_name:str='CE108外部β',target_exam_year:int|None=None,db_path:Path|str=DB_PATH):
+    from .security import hash_password
+    email=(email or '').strip().lower()
+    display_name=(display_name or '').strip()
+    grade=(grade or '').strip() or '4年'
+    school_name=(school_name or '').strip() or 'CE108外部β'
+    if not email or '@' not in email:raise ValueError('メールアドレスを確認してください。')
+    if len(password or '')<8:raise ValueError('パスワードは8文字以上にしてください。')
+    if not display_name:raise ValueError('表示名を入力してください。')
+    now=utc_now()
+    with connect(db_path) as conn:
+        exists=conn.execute('SELECT id FROM users WHERE lower(email)=lower(?)',(email,)).fetchone()
+        if exists:raise ValueError('このメールアドレスは既に登録されています。')
+        uid=conn.execute("INSERT INTO users(email,password_hash,role,status,created_at,updated_at) VALUES(?,?, 'student','active',?,?)",(email,hash_password(password),now,now)).lastrowid
+        conn.execute('''INSERT INTO user_profiles(user_id,display_name,school_name,grade,target_exam_year,daily_study_minutes,target_score,notification_time,diagnostic_completed) VALUES(?,?,?,?,?,15,108,'20:00',0)''',(uid,display_name,school_name,grade,target_exam_year))
+        org=conn.execute("SELECT id FROM organizations WHERE status='active' ORDER BY CASE WHEN name='CE108デモ養成校' THEN 0 ELSE 1 END,id LIMIT 1").fetchone()
+        if not org:
+            org_id=conn.execute("INSERT INTO organizations(name,organization_type,status,created_at) VALUES('CE108外部β','training_school','active',?)",(now,)).lastrowid
+        else:
+            org_id=org['id']
+        conn.execute("INSERT OR IGNORE INTO organization_memberships(organization_id,user_id,class_name,academic_year,membership_role) VALUES(?,?, '外部β',?, 'student')",(org_id,uid,date.today().year))
+    return get_user(uid,db_path)
+
 def list_topics(db_path:Path|str=DB_PATH):
     return [dict(r) for r in fetch_all('SELECT t.id,t.code,t.name,t.subject_id,s.name subject_name FROM topics t JOIN subjects s ON s.id=t.subject_id ORDER BY s.display_order,t.display_order',(),db_path)]
 

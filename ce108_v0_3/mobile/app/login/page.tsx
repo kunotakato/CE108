@@ -9,8 +9,9 @@ import { login } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("student@ce108.local");
-  const [password, setPassword] = useState("demo1234");
+  const demoLoginEnabled = process.env.NEXT_PUBLIC_ENABLE_DEMO_LOGIN === "true";
+  const [username, setUsername] = useState(demoLoginEnabled ? "student@ce108.local" : "");
+  const [password, setPassword] = useState(demoLoginEnabled ? "demo1234" : "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -36,9 +37,9 @@ export default function LoginPage() {
   return (
     <AppShell title="ログイン" nav={false}>
       <section className="hero stack">
-        <p className="eyebrow">Web Beta Prep v0.4.1</p>
+        <p className="eyebrow">Tester Readiness v0.4.2</p>
         <h1>今日の5問を、スマホで続ける。</h1>
-        <p className="lead">CE108 の学生向けモバイル学習画面です。外部β検証ではサンプル問題で操作感を確認できます。</p>
+        <p className="lead">CE108 の学生向けモバイル学習画面です。発行された外部βアカウントで操作感を確認できます。</p>
       </section>
       <form className="panel form" onSubmit={handleSubmit}>
         <label className="field">
@@ -57,6 +58,20 @@ export default function LoginPage() {
         <button className="primary-button" disabled={loading} type="submit">
           {loading ? "ログイン中" : "ログイン"}
         </button>
+        {demoLoginEnabled ? (
+          <button
+            className="secondary-button"
+            disabled={loading}
+            type="button"
+            onClick={() => {
+              setUsername("student@ce108.local");
+              setPassword("demo1234");
+            }}
+          >
+            デモ学生を入力
+          </button>
+        ) : null}
+        <p className="muted">収録問題は操作検証用のオリジナルサンプルです。合格予測ではありません。個人情報、患者情報、学校の非公開資料、支払い情報は入力しないでください。</p>
       </form>
       {error ? <ErrorState message={error} /> : null}
     </AppShell>
