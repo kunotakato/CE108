@@ -20,6 +20,7 @@ from ce108.services import (
     generate_daily_plan,
     get_focus_plan,
     get_admin_quality_summary,
+    get_beta_feedback_summary,
     get_daily_status,
     get_diagnostic_state,
     get_mastery_report,
@@ -188,6 +189,15 @@ class TestCore(unittest.TestCase):
         saved = fetch_one('SELECT * FROM beta_feedback WHERE id=?', (feedback_id,), self.db)
         self.assertEqual(saved['user_id'], self.student['id'])
         self.assertEqual(saved['rating'], 5)
+
+    def test_beta_feedback_summary_prioritizes_urgent_items(self):
+        save_beta_feedback(self.student['id'], 2, '不具合', 'ログインできないです', '/login', 'test-agent', self.db)
+        save_beta_feedback(self.student['id'], 5, '使いやすさ', '毎日続けられそうです', '/home', 'test-agent', self.db)
+        summary = get_beta_feedback_summary(self.db)
+        self.assertEqual(summary['total'], 2)
+        self.assertEqual(summary['category_counts']['不具合'], 1)
+        self.assertEqual(summary['priority_counts']['高'], 1)
+        self.assertEqual(summary['items'][0]['priority'], '低')
 
     def test_create_beta_student_can_login_and_is_assigned(self):
         user = create_beta_student('beta1@example.com', 'tester1234', '外部β1', db_path=self.db)

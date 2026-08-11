@@ -123,6 +123,35 @@ def teacher_results(u):
 
 def admin_dash(u):
     hero('管理者ダッシュボード','問題・権利・公開状態・品質状態を管理します。');q=get_admin_quality_summary();df=pd.DataFrame(q['items']);c=st.columns(4);c[0].metric('登録問題数',len(df));c[1].metric('公開可能',q['counts']['ready']);c[2].metric('要確認',q['counts']['needs_review']);c[3].metric('公開不可',q['counts']['blocked']);st.dataframe(df,width='stretch',hide_index=True)
+
+def admin_feedback(u):
+    hero('βフィードバック分析','外部テスターの意見を一覧化し、集中している不満と早急対応が必要な項目を確認します。');summary=get_beta_feedback_summary();items=summary['items']
+    c=st.columns(4);c[0].metric('総件数',summary['total']);c[1].metric('平均評価',summary['avg_rating']);c[2].metric('早急対応',summary['priority_counts'].get('高',0));c[3].metric('直近確認',items[0]['created_at'] if items else 'なし')
+    if not items:st.info('まだフィードバックはありません。');return
+    left,right=st.columns(2)
+    with left:
+        st.subheader('カテゴリ別件数')
+        st.bar_chart(pd.Series(summary['category_counts']).sort_values(ascending=False))
+    with right:
+        st.subheader('対応優先度')
+        st.bar_chart(pd.Series(summary['priority_counts']).reindex(['高','中','低']).fillna(0))
+    df=pd.DataFrame(items)
+    st.subheader('フィードバック一覧')
+    f1,f2,f3=st.columns([1,1,2])
+    cat=f1.selectbox('カテゴリ',['すべて']+sorted(df['category'].dropna().unique().tolist()))
+    pri=f2.selectbox('優先度',['すべて','高','中','低'])
+    word=f3.text_input('本文検索',placeholder='例: ログイン、解説、Failed')
+    view=df.copy()
+    if cat!='すべて':view=view[view['category']==cat]
+    if pri!='すべて':view=view[view['priority']==pri]
+    if word.strip():view=view[view['message'].str.contains(word.strip(),case=False,na=False)]
+    show=view[['priority','rating','category','message','page_url','created_at','email','display_name']].rename(columns={'priority':'優先度','rating':'評価','category':'カテゴリ','message':'内容','page_url':'画面','created_at':'日時','email':'メール','display_name':'表示名'})
+    st.dataframe(show,width='stretch',hide_index=True)
+    st.download_button('表示中のフィードバックをCSV出力',show.to_csv(index=False).encode('utf-8-sig'),'ce108_beta_feedback.csv','text/csv',width='stretch')
+    urgent=df[df['priority']=='高']
+    if not urgent.empty:
+        with st.expander('早急対応が必要な意見',expanded=True):
+            for _,r in urgent.head(10).iterrows():st.warning(f"{r['created_at']}｜{r['category']}｜評価{r['rating']}｜{r['display_name']}：{r['message']}")
 def admin_add(u):
     hero('問題登録','オリジナル問題または権利確認済み問題を登録します。');topics=list_topics();to={f"{x['code']}｜{x['name']}":x['code'] for x in topics}
     with st.form('addq2'):
@@ -161,5 +190,5 @@ u=get_user(st.session_state.user_id)
 with st.sidebar:
     st.markdown('## CE108');st.write('**'+u['display_name']+'**');st.caption('権限：'+u['role'])
     if st.button('ログアウト',width='stretch'):logout()
-    menus={'student':['ホーム','初回30問診断','今日の問題','苦手・得意分析','復習予定','学習履歴','教員からの課題'],'teacher':['教員ダッシュボード','課題作成','課題結果'],'admin':['管理者ダッシュボード','問題登録','CSV一括登録','問題承認','問題非公開化']};page=st.radio('メニュー',menus[u['role']])
-funcs={'ホーム':student_home,'初回30問診断':student_diag,'今日の問題':student_daily,'苦手・得意分析':mastery,'復習予定':reviews,'学習履歴':history,'教員からの課題':assignments,'教員ダッシュボード':teacher_dash,'課題作成':teacher_task,'課題結果':teacher_results,'管理者ダッシュボード':admin_dash,'問題登録':admin_add,'CSV一括登録':admin_csv,'問題承認':admin_approve,'問題非公開化':admin_unpublish};funcs[page](u)
+    menus={'student':['ホーム','初回30問診断','今日の問題','苦手・得意分析','復習予定','学習履歴','教員からの課題'],'teacher':['教員ダッシュボード','課題作成','課題結果'],'admin':['管理者ダッシュボード','βフィードバック分析','問題登録','CSV一括登録','問題承認','問題非公開化']};page=st.radio('メニュー',menus[u['role']])
+funcs={'ホーム':student_home,'初回30問診断':student_diag,'今日の問題':student_daily,'苦手・得意分析':mastery,'復習予定':reviews,'学習履歴':history,'教員からの課題':assignments,'教員ダッシュボード':teacher_dash,'課題作成':teacher_task,'課題結果':teacher_results,'管理者ダッシュボード':admin_dash,'βフィードバック分析':admin_feedback,'問題登録':admin_add,'CSV一括登録':admin_csv,'問題承認':admin_approve,'問題非公開化':admin_unpublish};funcs[page](u)

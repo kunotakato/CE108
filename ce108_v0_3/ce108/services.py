@@ -296,6 +296,38 @@ def save_beta_feedback(user_id:int,rating:int,category:str,message:str,page_url:
     if len(message)<3:raise ValueError('フィードバック内容を3文字以上で入力してください。')
     return execute('INSERT INTO beta_feedback(user_id,rating,category,message,page_url,user_agent,created_at) VALUES(?,?,?,?,?,?,?)',(user_id,rating,category,message,page_url,user_agent,utc_now()),db_path)
 
+def _feedback_priority(r:dict)->str:
+    message=(r.get('message') or '').lower()
+    urgent_words={'failed','fetch','error','エラー','ログインできない','動かない','開けない','回答できない','保存できない','消え','落ちる','真っ白'}
+    if r.get('category')=='不具合' or int(r.get('rating') or 0)<=2 or any(w in message for w in urgent_words):return '高'
+    if int(r.get('rating') or 0)==3 or r.get('category') in {'問題・解説','要望'}:return '中'
+    return '低'
+
+def list_beta_feedback(limit:int=200,db_path:Path|str=DB_PATH):
+    rows=fetch_all('''SELECT f.id,f.rating,f.category,f.message,f.page_url,f.user_agent,f.created_at,u.email,p.display_name
+        FROM beta_feedback f
+        JOIN users u ON u.id=f.user_id
+        JOIN user_profiles p ON p.user_id=u.id
+        ORDER BY f.created_at DESC,f.id DESC
+        LIMIT ?''',(max(1,min(int(limit or 200),1000)),),db_path)
+    items=[]
+    for row in rows:
+        d=dict(row);d['priority']=_feedback_priority(d);items.append(d)
+    return items
+
+def get_beta_feedback_summary(db_path:Path|str=DB_PATH):
+    items=list_beta_feedback(1000,db_path)
+    counts={'高':0,'中':0,'低':0}
+    categories={}
+    pages={}
+    for item in items:
+        counts[item['priority']]+=1
+        categories[item['category']]=categories.get(item['category'],0)+1
+        page=item.get('page_url') or '未記録'
+        pages[page]=pages.get(page,0)+1
+    avg=round(sum(int(i['rating']) for i in items)/len(items),2) if items else 0
+    return {'total':len(items),'avg_rating':avg,'priority_counts':counts,'category_counts':categories,'page_counts':pages,'items':items}
+
 def get_teacher_support_summary(teacher_id:int,db_path:Path|str=DB_PATH):
     students=list_students_for_teacher(teacher_id,db_path);today=date.today();rows=[]
     for s in students:
