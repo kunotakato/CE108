@@ -4,7 +4,7 @@
 
 This guide explains what must be prepared before giving CE108 to people outside the local development environment.
 
-v0.4.2 is for first-tester readiness. It is not a public commercial launch.
+v0.4.3 is for first-tester operations. It is not a public commercial launch.
 
 ## Who Can Test
 
@@ -64,7 +64,7 @@ Please send usability feedback from the feedback screen after trying it.
 - Tester student accounts are issued before sharing the mobile URL.
 - Demo account autofill is disabled on the public mobile URL unless intentionally enabled.
 - Teacher/admin Streamlit screens are not publicly exposed.
-- `/health` returns `0.4.2`.
+- `/health` returns `0.4.3`.
 - Mobile login succeeds.
 - Feedback submission succeeds.
 

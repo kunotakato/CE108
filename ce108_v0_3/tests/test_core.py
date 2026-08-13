@@ -21,6 +21,7 @@ from ce108.services import (
     get_focus_plan,
     get_admin_quality_summary,
     get_beta_feedback_summary,
+    get_beta_tester_activity,
     get_daily_status,
     get_diagnostic_state,
     get_mastery_report,
@@ -37,6 +38,7 @@ from ce108.services import (
     add_exam_event,
     add_score_record,
     save_beta_feedback,
+    record_login_event,
     schedule_review,
     set_target_exam_date,
     start_diagnostic,
@@ -198,6 +200,19 @@ class TestCore(unittest.TestCase):
         self.assertEqual(summary['category_counts']['不具合'], 1)
         self.assertEqual(summary['priority_counts']['高'], 1)
         self.assertEqual(summary['items'][0]['priority'], '低')
+
+    def test_beta_tester_activity_tracks_login_answers_and_feedback(self):
+        tester = create_beta_student('activity@example.com', 'tester1234', '活動確認', db_path=self.db)
+        record_login_event(tester, self.db)
+        q = get_question(1, self.db)
+        record_answer(tester['id'], q['id'], q['correct_codes'], None, 'たぶん分かる', 30, 'daily', db_path=self.db)
+        save_beta_feedback(tester['id'], 4, '要望', '続け方を確認しました', '/home', 'test-agent', self.db)
+        rows = get_beta_tester_activity(db_path=self.db)
+        row = next(r for r in rows if r['email'] == 'activity@example.com')
+        self.assertEqual(row['status_label'], 'フィードバック済み')
+        self.assertEqual(row['login_count'], 1)
+        self.assertEqual(row['answer_count'], 1)
+        self.assertEqual(row['feedback_count'], 1)
 
     def test_create_beta_student_can_login_and_is_assigned(self):
         user = create_beta_student('beta1@example.com', 'tester1234', '外部β1', db_path=self.db)
@@ -366,6 +381,23 @@ class TestApi(unittest.TestCase):
     def test_admin_quality_api_forbidden_to_student(self):
         token = self._token()
         res = self.client.get('/api/admin/quality', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(res.status_code, 403)
+
+    def test_admin_beta_feedback_and_activity_api(self):
+        admin_token = self._token('admin@ce108.local')
+        student_token = self._token()
+        res = self.client.post('/api/beta/feedback', headers={'Authorization': f'Bearer {student_token}'}, json={'rating': 2, 'category': '不具合', 'message': 'Failed to fetch が出ました', 'page_url': '/login'})
+        self.assertEqual(res.status_code, 200)
+        summary = self.client.get('/api/admin/beta-feedback/summary', headers={'Authorization': f'Bearer {admin_token}'})
+        self.assertEqual(summary.status_code, 200)
+        self.assertGreaterEqual(summary.json()['priority_counts']['高'], 1)
+        activity = self.client.get('/api/admin/tester-students/activity', headers={'Authorization': f'Bearer {admin_token}'})
+        self.assertEqual(activity.status_code, 200)
+        self.assertTrue(isinstance(activity.json(), list))
+
+    def test_student_cannot_read_admin_beta_feedback_api(self):
+        token = self._token()
+        res = self.client.get('/api/admin/beta-feedback/summary', headers={'Authorization': f'Bearer {token}'})
         self.assertEqual(res.status_code, 403)
 
     def test_admin_can_create_tester_student_api(self):

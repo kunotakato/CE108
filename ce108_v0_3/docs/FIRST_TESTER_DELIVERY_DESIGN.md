@@ -154,7 +154,7 @@ URL:
 
 渡す直前:
 
-- `/health`が`0.4.2`を返す。
+- `/health`が`0.4.3`を返す。
 - mobile公開URLでログイン画面が開く。
 - `CE108_CORS_ORIGINS`にmobile公開URLが入っている。
 - `NEXT_PUBLIC_API_BASE_URL`がAPI公開URLを指している。

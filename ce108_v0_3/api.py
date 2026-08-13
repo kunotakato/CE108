@@ -25,6 +25,8 @@ from ce108.services import (
     get_focus_plan,
     get_diagnostic_state,
     get_admin_quality_summary,
+    get_beta_feedback_summary,
+    get_beta_tester_activity,
     get_daily_status,
     get_question,
     get_learning_summary,
@@ -42,6 +44,7 @@ from ce108.services import (
     list_student_notes,
     public_question,
     record_answer,
+    record_login_event,
     add_exam_event,
     add_score_record,
     save_beta_feedback,
@@ -54,7 +57,7 @@ async def lifespan(app: FastAPI):
     seed_database()
     yield
 
-app = FastAPI(title='CE108 API', version='0.4.2', lifespan=lifespan)
+app = FastAPI(title='CE108 API', version='0.4.3', lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
 oauth = OAuth2PasswordBearer(tokenUrl='/api/auth/login')
 
@@ -167,13 +170,14 @@ async def permission_error_handler(request: Request, exc: PermissionError):
 
 @app.get('/health')
 def health():
-    return {'status': 'ok', 'version': '0.4.2'}
+    return {'status': 'ok', 'version': '0.4.3'}
 
 @app.post('/api/auth/login')
 def login(form: Annotated[OAuth2PasswordRequestForm, Depends()]):
     user = authenticate_user(form.username, form.password)
     if not user:
         raise HTTPException(401, 'メールアドレスまたはパスワードが違います。')
+    record_login_event(user)
     return {'access_token': create_access_token(user['id'], user['role']), 'token_type': 'bearer', 'user': get_user(user['id'])}
 
 @app.get('/api/users/me')
@@ -337,6 +341,18 @@ def admin_questions(limit: int = 500, user=Depends(require_role('admin'))):
 @app.get('/api/admin/quality')
 def admin_quality(user=Depends(require_role('admin'))):
     return get_admin_quality_summary()
+
+@app.get('/api/admin/beta-feedback')
+def admin_beta_feedback(limit: int = 200, user=Depends(require_role('admin'))):
+    return get_beta_feedback_summary()['items'][:max(1, min(limit, 1000))]
+
+@app.get('/api/admin/beta-feedback/summary')
+def admin_beta_feedback_summary(user=Depends(require_role('admin'))):
+    return get_beta_feedback_summary()
+
+@app.get('/api/admin/tester-students/activity')
+def admin_tester_activity(limit: int = 200, user=Depends(require_role('admin'))):
+    return get_beta_tester_activity(limit)
 
 @app.post('/api/admin/tester-students')
 def admin_create_tester_student(req: BetaStudentRequest, user=Depends(require_role('admin'))):

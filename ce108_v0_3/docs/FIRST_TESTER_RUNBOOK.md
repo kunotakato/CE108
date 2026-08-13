@@ -2,14 +2,14 @@
 
 ## Goal
 
-v0.4.2の目的は、最初の外部テスター1人がスマートフォンでCE108を触り、学習導線とフィードバック導線を確認できる状態にすることです。
+v0.4.3の目的は、最初の外部テスター1人がスマートフォンでCE108を触り、学習導線、ログイン活動、フィードバック導線を確認できる状態にすることです。
 
 最初の1人へ何をどう渡すかの設計は、`docs/FIRST_TESTER_DELIVERY_DESIGN.md`を参照してください。
 
 ## Before Inviting
 
 - FastAPIとmobileの公開URLがHTTPSで開ける。
-- `/health`が`0.4.2`を返す。
+- `/health`が`0.4.3`を返す。
 - `CE108_APP_SECRET`をデモ値から変更している。
 - `CE108_CORS_ORIGINS`にmobile公開URLだけを設定している。
 - `NEXT_PUBLIC_API_BASE_URL`にFastAPI公開URLを設定している。
@@ -96,3 +96,11 @@ CE108は外部β版です。
 - 画面、日時、ユーザー、本文
 
 優先度「高」は、不具合、低評価、ログイン不可、Failed to fetch、保存不可などの文言から自動判定します。
+
+Render上でStreamlit管理画面を公開していない場合は、管理者トークンでFastAPIから確認します。
+
+```text
+GET /api/admin/tester-students/activity
+GET /api/admin/beta-feedback/summary
+GET /api/admin/beta-feedback
+```

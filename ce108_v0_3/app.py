@@ -126,6 +126,10 @@ def admin_dash(u):
 
 def admin_feedback(u):
     hero('βフィードバック分析','外部テスターの意見を一覧化し、集中している不満と早急対応が必要な項目を確認します。');summary=get_beta_feedback_summary();items=summary['items']
+    activity=pd.DataFrame(get_beta_tester_activity())
+    if not activity.empty:
+        st.subheader('テスター活動状況')
+        st.dataframe(activity[['status_label','display_name','email','last_login_at','login_count','answer_count','accuracy','feedback_count','last_feedback_at']].rename(columns={'status_label':'状態','display_name':'表示名','email':'メール','last_login_at':'最終ログイン','login_count':'ログイン回数','answer_count':'回答数','accuracy':'正答率','feedback_count':'FB数','last_feedback_at':'最終FB'}),width='stretch',hide_index=True)
     c=st.columns(4);c[0].metric('総件数',summary['total']);c[1].metric('平均評価',summary['avg_rating']);c[2].metric('早急対応',summary['priority_counts'].get('高',0));c[3].metric('直近確認',items[0]['created_at'] if items else 'なし')
     if not items:st.info('まだフィードバックはありません。');return
     left,right=st.columns(2)

@@ -1,6 +1,6 @@
-# CE108 v0.4.2 Tester Readiness
+# CE108 v0.4.3 First Tester Operations
 
-臨床工学技士国家試験対策のローカル実動プロトタイプです。v0.4では、学生が毎日使い続けるための日次学習体験、復習キュー、教員支援、管理者品質チェックを追加しています。v0.4.2では、最初の外部テスターに渡すためのアカウント発行、安全文言、ノートAI復習の注意、検収手順を整理しています。
+臨床工学技士国家試験対策のローカル実動プロトタイプです。v0.4では、学生が毎日使い続けるための日次学習体験、復習キュー、教員支援、管理者品質チェックを追加しています。v0.4.3では、最初の外部テスターのログイン活動、回答、フィードバックを管理者が確認できる運用機能を追加しています。
 
 ## 実装済み
 
@@ -81,6 +81,13 @@
 - ローカル検証時だけデモ学生入力ボタンを表示可能
 - ノートAI復習に個人情報・患者情報入力禁止と生成誤りの注意を表示
 - 外部テスター向けRunbookと検収レポートを追加
+
+### First Tester Operations v0.4.3
+- ログイン成功履歴を保存
+- 管理者APIで外部βテスターの活動状況を確認可能
+- 管理者APIでβフィードバック一覧・集計を確認可能
+- Streamlit管理画面の「βフィードバック分析」にテスター活動表を追加
+- 日本時間基準で今日の回答完了と連続学習日数を判定
 
 ## 重要事項
 
@@ -167,6 +174,9 @@ GET  /api/teacher/support
 GET  /api/teacher/assignments/{assignment_id}/results.csv
 GET  /api/admin/questions
 GET  /api/admin/quality
+GET  /api/admin/tester-students/activity
+GET  /api/admin/beta-feedback
+GET  /api/admin/beta-feedback/summary
 POST /api/admin/questions
 POST /api/admin/tester-students
 POST /api/admin/questions/{qid}/approve

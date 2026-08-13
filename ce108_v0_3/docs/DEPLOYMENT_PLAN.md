@@ -1,8 +1,8 @@
-# CE108 v0.4.2 Deployment Plan
+# CE108 v0.4.3 Deployment Plan
 
 ## Purpose
 
-v0.4.2 is a first-tester readiness release built on the web deployment preparation work.
+v0.4.3 is a first-tester operations release built on the web deployment preparation work.
 
 The goal is not full production commercialization. The goal is to make CE108 ready to be shared through external URLs for small beta validation while keeping the v0.4 architecture intact.
 
@@ -79,7 +79,7 @@ https://your-api.example.com/health
 Expected response:
 
 ```json
-{"status":"ok","version":"0.4.2"}
+{"status":"ok","version":"0.4.3"}
 ```
 
 ## Mobile Deployment Steps
@@ -137,7 +137,7 @@ Important:
 
 ## Web Beta Acceptance Checks
 
-- `/health` returns `0.4.2`.
+- `/health` returns `0.4.3`.
 - Mobile login succeeds from the deployed mobile URL.
 - `/api/users/me` succeeds after login.
 - Home loads without `Failed to fetch`.

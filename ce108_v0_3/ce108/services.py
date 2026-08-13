@@ -1,8 +1,9 @@
 from __future__ import annotations
-import csv, io, json, math, re
+import csv, io, json, math, os, re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 from .config import DB_PATH
 from .database import connect, execute, fetch_all, fetch_one, utc_now
 
@@ -26,6 +27,17 @@ NOTE_TOPIC_KEYWORDS=[
     ('MED-ANAT',{'心臓','血圧','血液','腎','肺','神経','解剖','生理'}),
 ]
 
+def _tz():
+    try:return ZoneInfo(os.getenv('CE108_TIMEZONE','Asia/Tokyo'))
+    except Exception:return ZoneInfo('Asia/Tokyo')
+
+def _today()->date:
+    return datetime.now(_tz()).date()
+
+def _local_date(value:str)->date:
+    dt=datetime.fromisoformat(value.replace('Z','+00:00'))
+    return dt.astimezone(_tz()).date() if dt.tzinfo else dt.date()
+
 def authenticate_user(email:str,password:str,db_path:Path|str=DB_PATH):
     from .security import verify_password
     row=fetch_one('''SELECT u.*,p.display_name,p.grade,p.diagnostic_completed FROM users u JOIN user_profiles p ON p.user_id=u.id WHERE lower(u.email)=lower(?) AND u.status='active' ''',(email.strip(),),db_path)
@@ -34,6 +46,9 @@ def authenticate_user(email:str,password:str,db_path:Path|str=DB_PATH):
 def get_user(user_id:int,db_path:Path|str=DB_PATH):
     row=fetch_one('''SELECT u.id,u.email,u.line_user_id,u.role,u.status,p.display_name,p.school_name,p.grade,p.target_exam_year,p.daily_study_minutes,p.target_score,p.notification_time,p.diagnostic_completed FROM users u JOIN user_profiles p ON p.user_id=u.id WHERE u.id=?''',(user_id,),db_path)
     return dict(row) if row else None
+
+def record_login_event(user:dict,db_path:Path|str=DB_PATH)->int:
+    return execute('INSERT INTO login_events(user_id,role,email,logged_in_at) VALUES(?,?,?,?)',(user['id'],user['role'],user['email'],utc_now()),db_path)
 
 def create_beta_student(email:str,password:str,display_name:str,grade:str='4年',school_name:str='CE108外部β',target_exam_year:int|None=None,db_path:Path|str=DB_PATH):
     from .security import hash_password
@@ -55,7 +70,7 @@ def create_beta_student(email:str,password:str,display_name:str,grade:str='4年'
             org_id=conn.execute("INSERT INTO organizations(name,organization_type,status,created_at) VALUES('CE108外部β','training_school','active',?)",(now,)).lastrowid
         else:
             org_id=org['id']
-        conn.execute("INSERT OR IGNORE INTO organization_memberships(organization_id,user_id,class_name,academic_year,membership_role) VALUES(?,?, '外部β',?, 'student')",(org_id,uid,date.today().year))
+        conn.execute("INSERT OR IGNORE INTO organization_memberships(organization_id,user_id,class_name,academic_year,membership_role) VALUES(?,?, '外部β',?, 'student')",(org_id,uid,_today().year))
     return get_user(uid,db_path)
 
 def list_topics(db_path:Path|str=DB_PATH):
@@ -137,7 +152,7 @@ def update_mastery(user_id:int,question_id:int,correct:bool,confidence:str,secon
 def schedule_review(user_id:int,question_id:int,correct:bool,confidence:str,importance:int,db_path:Path|str=DB_PATH)->str:
     days=1 if (not correct or confidence=='勘で答えた') else 3 if confidence=='迷った' else 7 if confidence=='たぶん分かる' else 14
     if importance>=5 and days>1:days=max(1,days-2)
-    target=(date.today()+timedelta(days=days)).isoformat()
+    target=(_today()+timedelta(days=days)).isoformat()
     execute("INSERT OR IGNORE INTO review_schedules(user_id,question_id,review_type,scheduled_date,priority,status,created_at) VALUES(?,?, 'same_or_similar',?,?,'pending',?)",(user_id,question_id,target,float(importance),utc_now()),db_path);return target
 
 def record_answer(user_id:int,question_id:int,selected_codes:list[str]|None,numeric_answer:float|None,confidence:str,response_time_seconds:int,answer_mode:str,session_id:str|None=None,db_path:Path|str=DB_PATH):
@@ -155,7 +170,7 @@ def record_answer(user_id:int,question_id:int,selected_codes:list[str]|None,nume
 def _count(minutes:int)->int:return max(3,min(20,round(minutes/3)))
 
 def generate_daily_plan(user_id:int,count:int|None=None,plan_date:str|None=None,db_path:Path|str=DB_PATH):
-    plan_date=plan_date or date.today().isoformat();user=get_user(user_id,db_path);count=count or _count(int(user['daily_study_minutes'] or 15))
+    plan_date=plan_date or _today().isoformat();user=get_user(user_id,db_path);count=count or _count(int(user['daily_study_minutes'] or 15))
     old=fetch_one('SELECT id FROM daily_study_plans WHERE user_id=? AND plan_date=?',(user_id,plan_date),db_path)
     if old:return get_daily_plan(user_id,plan_date,db_path)
     due=[dict(r) for r in fetch_all('''SELECT r.question_id,q.importance FROM review_schedules r JOIN questions q ON q.id=r.question_id WHERE r.user_id=? AND r.status='pending' AND r.scheduled_date<=? AND q.status='published' ORDER BY r.priority DESC,r.scheduled_date LIMIT ?''',(user_id,plan_date,count),db_path)]
@@ -174,10 +189,11 @@ def generate_daily_plan(user_id:int,count:int|None=None,plan_date:str|None=None,
     return get_daily_plan(user_id,plan_date,db_path)
 
 def get_daily_plan(user_id:int,plan_date:str|None=None,db_path:Path|str=DB_PATH):
-    plan_date=plan_date or date.today().isoformat();p=fetch_one('SELECT * FROM daily_study_plans WHERE user_id=? AND plan_date=?',(user_id,plan_date),db_path)
+    plan_date=plan_date or _today().isoformat();p=fetch_one('SELECT * FROM daily_study_plans WHERE user_id=? AND plan_date=?',(user_id,plan_date),db_path)
     if not p:return None
-    items=fetch_all('''SELECT i.*,q.question_text,q.question_type,q.importance,s.name subject_name,t.name topic_name,EXISTS(SELECT 1 FROM answer_history a WHERE a.user_id=? AND a.question_id=i.question_id AND date(a.answered_at)=? AND a.answer_mode='daily') completed FROM daily_study_plan_items i JOIN questions q ON q.id=i.question_id LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary' LEFT JOIN topics t ON t.id=m.topic_id LEFT JOIN subjects s ON s.id=t.subject_id WHERE i.plan_id=? ORDER BY i.display_order''',(user_id,plan_date,p['id']),db_path)
-    d=dict(p);d['items']=[dict(r) for r in items];return d
+    items=fetch_all('''SELECT i.*,q.question_text,q.question_type,q.importance,s.name subject_name,t.name topic_name FROM daily_study_plan_items i JOIN questions q ON q.id=i.question_id LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary' LEFT JOIN topics t ON t.id=m.topic_id LEFT JOIN subjects s ON s.id=t.subject_id WHERE i.plan_id=? ORDER BY i.display_order''',(p['id'],),db_path)
+    answered={r['question_id'] for r in fetch_all("SELECT question_id,answered_at FROM answer_history WHERE user_id=? AND answer_mode='daily'",(user_id,),db_path) if _local_date(r['answered_at']).isoformat()==plan_date}
+    d=dict(p);d['items']=[{**dict(r),'completed':r['question_id'] in answered} for r in items];return d
 
 def get_focus_plan(user_id:int,mode:str='balanced',count:int=5,db_path:Path|str=DB_PATH):
     mode=mode if mode in FOCUS_MODES else 'balanced';cfg=FOCUS_MODES[mode];count=max(3,min(10,int(count or 5)))
@@ -191,13 +207,13 @@ def get_focus_plan(user_id:int,mode:str='balanced',count:int=5,db_path:Path|str=
     for i,r in enumerate(rows,1):
         typ='苦手' if float(r['mastery'] or 0)<40 else ('必達' if int(r['importance'])>=4 else '新規')
         items.append({'id':i,'plan_id':0,'question_id':r['question_id'],'item_type':typ,'display_order':i,'reason':cfg['reason'],'question_text':r['question_text'],'question_type':r['question_type'],'importance':r['importance'],'subject_name':r['subject_name'],'topic_name':r['topic_name'],'completed':0})
-    return {'id':0,'plan_date':date.today().isoformat(),'mode':mode,'mode_label':cfg['label'],'recommended_count':len(items),'estimated_minutes':max(5,round(len(items)*2.5)),'status':'not_started','items':items}
+    return {'id':0,'plan_date':_today().isoformat(),'mode':mode,'mode_label':cfg['label'],'recommended_count':len(items),'estimated_minutes':max(5,round(len(items)*2.5)),'status':'not_started','items':items}
 
 def get_mastery_report(user_id:int,db_path:Path|str=DB_PATH):
     return [dict(r) for r in fetch_all('''SELECT s.name subject_name,t.name topic_name,COALESCE(m.mastery_score,0) mastery_score,COALESCE(m.retention_score,0) retention_score,COALESCE(m.total_answers,0) total_answers,COALESCE(m.correct_answers,0) correct_answers,m.last_answered_at FROM topics t JOIN subjects s ON s.id=t.subject_id LEFT JOIN user_topic_mastery m ON m.topic_id=t.id AND m.user_id=? ORDER BY mastery_score,s.display_order,t.display_order''',(user_id,),db_path)]
 
 def get_learning_summary(user_id:int,db_path:Path|str=DB_PATH):
-    r=fetch_one('SELECT COUNT(*) total,COALESCE(SUM(is_correct),0) correct,COALESCE(AVG(response_time_seconds),0) avg_seconds FROM answer_history WHERE user_id=?',(user_id,),db_path);due=fetch_one("SELECT COUNT(*) due FROM review_schedules WHERE user_id=? AND status='pending' AND scheduled_date<=?",(user_id,date.today().isoformat()),db_path);total=int(r['total']);correct=int(r['correct']);return {'total':total,'correct':correct,'accuracy':round(correct/total*100,1) if total else 0,'avg_seconds':round(r['avg_seconds'],1),'due_reviews':due['due']}
+    r=fetch_one('SELECT COUNT(*) total,COALESCE(SUM(is_correct),0) correct,COALESCE(AVG(response_time_seconds),0) avg_seconds FROM answer_history WHERE user_id=?',(user_id,),db_path);due=fetch_one("SELECT COUNT(*) due FROM review_schedules WHERE user_id=? AND status='pending' AND scheduled_date<=?",(user_id,_today().isoformat()),db_path);total=int(r['total']);correct=int(r['correct']);return {'total':total,'correct':correct,'accuracy':round(correct/total*100,1) if total else 0,'avg_seconds':round(r['avg_seconds'],1),'due_reviews':due['due']}
 
 def set_target_exam_date(user_id:int,target_exam_date:str,db_path:Path|str=DB_PATH):
     datetime.fromisoformat(target_exam_date)
@@ -224,7 +240,7 @@ def add_score_record(user_id:int,score_type:str,title:str,taken_at:str,total_sco
 
 def _days_until(target:str|None)->int|None:
     if not target:return None
-    return (datetime.fromisoformat(target).date()-date.today()).days
+    return (datetime.fromisoformat(target).date()-_today()).days
 
 def _phase(days:int|None)->str:
     if days is None:return 'undecided'
@@ -259,11 +275,11 @@ def list_due_reviews(user_id:int,db_path:Path|str=DB_PATH):
     return [dict(r) for r in fetch_all('''SELECT r.scheduled_date,r.priority,q.id question_id,q.question_text,s.name subject_name,t.name topic_name FROM review_schedules r JOIN questions q ON q.id=r.question_id LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary' LEFT JOIN topics t ON t.id=m.topic_id LEFT JOIN subjects s ON s.id=t.subject_id WHERE r.user_id=? AND r.status='pending' ORDER BY r.scheduled_date,r.priority DESC''',(user_id,),db_path)]
 
 def _iso_date(value:str)->date:
-    return datetime.fromisoformat(value.replace('Z','+00:00')).date()
+    return _local_date(value)
 
 def _answer_dates(user_id:int,db_path:Path|str=DB_PATH)->list[date]:
-    rows=fetch_all("SELECT DISTINCT date(answered_at) d FROM answer_history WHERE user_id=? ORDER BY d DESC",(user_id,),db_path)
-    return [_iso_date(r['d']) for r in rows if r['d']]
+    rows=fetch_all("SELECT answered_at FROM answer_history WHERE user_id=? ORDER BY answered_at DESC",(user_id,),db_path)
+    return sorted({_local_date(r['answered_at']) for r in rows if r['answered_at']},reverse=True)
 
 def _streak(dates:list[date],today:date)->int:
     done=set(dates);cur=today;count=0
@@ -272,7 +288,7 @@ def _streak(dates:list[date],today:date)->int:
     return count
 
 def get_daily_status(user_id:int,db_path:Path|str=DB_PATH):
-    today=date.today();plan=generate_daily_plan(user_id,db_path=db_path);items=plan.get('items',[]) if plan else []
+    today=_today();plan=generate_daily_plan(user_id,db_path=db_path);items=plan.get('items',[]) if plan else []
     completed=sum(1 for i in items if i.get('completed'));total=len(items);dates=_answer_dates(user_id,db_path)
     week_start=today-timedelta(days=6);week=[{'date':(week_start+timedelta(days=i)).isoformat(),'completed':(week_start+timedelta(days=i)) in set(dates)} for i in range(7)]
     due=fetch_one("SELECT COUNT(*) due FROM review_schedules WHERE user_id=? AND status='pending' AND scheduled_date<=?",(user_id,today.isoformat()),db_path)
@@ -281,7 +297,7 @@ def get_daily_status(user_id:int,db_path:Path|str=DB_PATH):
     return {'date':today.isoformat(),'status':status,'completed_count':completed,'total_count':total,'estimated_minutes':plan.get('estimated_minutes',0) if plan else 0,'streak_days':_streak(dates,today),'weekly':week,'due_reviews':int(due['due']),'tomorrow_preview':{'review_count':int(tomorrow_count['n']),'message':'明日は復習から始めましょう。' if tomorrow_count['n'] else '明日も今日のペースで5問進めましょう。'},'next_action':'復習から始める' if int(due['due']) else ('続きから再開' if status=='in_progress' else '今日の5問を始める')}
 
 def get_review_queue(user_id:int,limit:int=20,db_path:Path|str=DB_PATH):
-    today=date.today().isoformat();rows=fetch_all('''SELECT r.id review_id,r.scheduled_date,r.priority,r.status,q.id question_id,q.question_text,q.question_type,s.name subject_name,t.name topic_name,EXISTS(SELECT 1 FROM answer_history a WHERE a.user_id=r.user_id AND a.question_id=r.question_id AND date(a.answered_at)>=r.scheduled_date) completed FROM review_schedules r JOIN questions q ON q.id=r.question_id LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary' LEFT JOIN topics t ON t.id=m.topic_id LEFT JOIN subjects s ON s.id=t.subject_id WHERE r.user_id=? AND r.status='pending' AND q.status='published' ORDER BY CASE WHEN r.scheduled_date<=? THEN 0 ELSE 1 END,r.scheduled_date,r.priority DESC LIMIT ?''',(user_id,today,max(1,min(limit,100))),db_path)
+    today=_today().isoformat();rows=fetch_all('''SELECT r.id review_id,r.scheduled_date,r.priority,r.status,q.id question_id,q.question_text,q.question_type,s.name subject_name,t.name topic_name,EXISTS(SELECT 1 FROM answer_history a WHERE a.user_id=r.user_id AND a.question_id=r.question_id AND substr(a.answered_at,1,10)>=r.scheduled_date) completed FROM review_schedules r JOIN questions q ON q.id=r.question_id LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary' LEFT JOIN topics t ON t.id=m.topic_id LEFT JOIN subjects s ON s.id=t.subject_id WHERE r.user_id=? AND r.status='pending' AND q.status='published' ORDER BY CASE WHEN r.scheduled_date<=? THEN 0 ELSE 1 END,r.scheduled_date,r.priority DESC LIMIT ?''',(user_id,today,max(1,min(limit,100))),db_path)
     items=[]
     for r in rows:
         label='完了' if r['completed'] else ('期限超過' if r['scheduled_date']<today else ('今日' if r['scheduled_date']==today else '今後'))
@@ -328,8 +344,32 @@ def get_beta_feedback_summary(db_path:Path|str=DB_PATH):
     avg=round(sum(int(i['rating']) for i in items)/len(items),2) if items else 0
     return {'total':len(items),'avg_rating':avg,'priority_counts':counts,'category_counts':categories,'page_counts':pages,'items':items}
 
+def get_beta_tester_activity(limit:int=200,db_path:Path|str=DB_PATH):
+    rows=fetch_all('''SELECT u.id,u.email,p.display_name,p.school_name,p.grade,
+        MAX(l.logged_in_at) last_login_at,
+        COUNT(DISTINCT l.id) login_count,
+        COUNT(DISTINCT a.id) answer_count,
+        COALESCE(ROUND(AVG(a.is_correct)*100,1),0) accuracy,
+        COUNT(DISTINCT f.id) feedback_count,
+        MAX(f.created_at) last_feedback_at
+        FROM users u
+        JOIN user_profiles p ON p.user_id=u.id
+        LEFT JOIN login_events l ON l.user_id=u.id
+        LEFT JOIN answer_history a ON a.user_id=u.id
+        LEFT JOIN beta_feedback f ON f.user_id=u.id
+        WHERE u.role='student' AND (p.school_name LIKE '%外部β%' OR u.email NOT LIKE '%@ce108.local')
+        GROUP BY u.id
+        ORDER BY COALESCE(last_login_at,'') DESC,u.id DESC
+        LIMIT ?''',(max(1,min(int(limit or 200),1000)),),db_path)
+    items=[]
+    for r in rows:
+        d=dict(r)
+        d['status_label']='未ログイン' if not d['last_login_at'] else ('フィードバック済み' if int(d['feedback_count'] or 0)>0 else ('回答済み' if int(d['answer_count'] or 0)>0 else 'ログイン済み'))
+        items.append(d)
+    return items
+
 def get_teacher_support_summary(teacher_id:int,db_path:Path|str=DB_PATH):
-    students=list_students_for_teacher(teacher_id,db_path);today=date.today();rows=[]
+    students=list_students_for_teacher(teacher_id,db_path);today=_today();rows=[]
     for s in students:
         last=fetch_one('SELECT MAX(answered_at) last_answered_at FROM answer_history WHERE user_id=?',(s['id'],),db_path)
         due=fetch_one("SELECT COUNT(*) due FROM review_schedules WHERE user_id=? AND status='pending' AND scheduled_date<=?",(s['id'],today.isoformat()),db_path)

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document is the concrete Render deployment guide for CE108 v0.4.2.
+This document is the concrete Render deployment guide for CE108 v0.4.3.
 
 Use this when you want external beta testers to access CE108 from public URLs instead of `127.0.0.1`.
 
@@ -95,7 +95,7 @@ https://YOUR-API-SERVICE.onrender.com/health
 Expected:
 
 ```json
-{"status":"ok","version":"0.4.2"}
+{"status":"ok","version":"0.4.3"}
 ```
 
 6. Deploy or redeploy `ce108-mobile` after `NEXT_PUBLIC_API_BASE_URL` is set.
@@ -192,7 +192,7 @@ Check:
 
 - `NEXT_PUBLIC_API_BASE_URL` points to the API service URL.
 - `CE108_CORS_ORIGINS` includes the mobile service URL.
-- The API service is awake and `/health` returns `0.4.2`.
+- The API service is awake and `/health` returns `0.4.3`.
 - Mobile was rebuilt after setting `NEXT_PUBLIC_API_BASE_URL`.
 
 ### Data disappears
@@ -204,7 +204,7 @@ Check whether `ce108-api` is on a free plan. Free web services do not preserve S
 Before sending the URL:
 
 - API and mobile URLs are both HTTPS.
-- `/health` returns `0.4.2`.
+- `/health` returns `0.4.3`.
 - Demo login works.
 - Home loads.
 - Answer submission works.
