@@ -215,6 +215,14 @@ class TestCore(unittest.TestCase):
         self.assertEqual(row['answer_count'], 1)
         self.assertEqual(row['feedback_count'], 1)
 
+    def test_beta_tester_activity_shows_answered_without_login_event(self):
+        tester = create_beta_student('answered-before-tracking@example.com', 'tester1234', '履歴前回答', db_path=self.db)
+        q = get_question(1, self.db)
+        record_answer(tester['id'], q['id'], q['correct_codes'], None, 'たぶん分かる', 30, 'daily', db_path=self.db)
+        rows = get_beta_tester_activity(db_path=self.db)
+        row = next(r for r in rows if r['email'] == 'answered-before-tracking@example.com')
+        self.assertEqual(row['status_label'], '回答済み')
+
     def test_create_beta_student_can_login_and_is_assigned(self):
         user = create_beta_student('beta1@example.com', 'tester1234', '外部β1', db_path=self.db)
         logged_in = authenticate_user('beta1@example.com', 'tester1234', self.db)

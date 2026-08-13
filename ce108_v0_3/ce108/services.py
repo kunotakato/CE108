@@ -374,7 +374,7 @@ def get_beta_tester_activity(limit:int=200,db_path:Path|str=DB_PATH):
     items=[]
     for r in rows:
         d=dict(r)
-        d['status_label']='未ログイン' if not d['last_login_at'] else ('フィードバック済み' if int(d['feedback_count'] or 0)>0 else ('回答済み' if int(d['answer_count'] or 0)>0 else 'ログイン済み'))
+        d['status_label']='フィードバック済み' if int(d['feedback_count'] or 0)>0 else ('回答済み' if int(d['answer_count'] or 0)>0 else ('ログイン済み' if d['last_login_at'] else '未ログイン'))
         items.append(d)
     return items
 
