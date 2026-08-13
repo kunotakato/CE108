@@ -73,6 +73,16 @@ def create_beta_student(email:str,password:str,display_name:str,grade:str='4年'
         conn.execute("INSERT OR IGNORE INTO organization_memberships(organization_id,user_id,class_name,academic_year,membership_role) VALUES(?,?, '外部β',?, 'student')",(org_id,uid,_today().year))
     return get_user(uid,db_path)
 
+def set_user_password(email:str,password:str,db_path:Path|str=DB_PATH):
+    from .security import hash_password
+    email=(email or '').strip().lower()
+    if not email or '@' not in email:raise ValueError('メールアドレスを確認してください。')
+    if len(password or '')<8:raise ValueError('パスワードは8文字以上にしてください。')
+    user=fetch_one('SELECT id FROM users WHERE lower(email)=lower(?)',(email,),db_path)
+    if not user:raise ValueError('ユーザーが見つかりません。')
+    execute('UPDATE users SET password_hash=?,updated_at=? WHERE id=?',(hash_password(password),utc_now(),user['id']),db_path)
+    return get_user(user['id'],db_path)
+
 def list_topics(db_path:Path|str=DB_PATH):
     return [dict(r) for r in fetch_all('SELECT t.id,t.code,t.name,t.subject_id,s.name subject_name FROM topics t JOIN subjects s ON s.id=t.subject_id ORDER BY s.display_order,t.display_order',(),db_path)]
 

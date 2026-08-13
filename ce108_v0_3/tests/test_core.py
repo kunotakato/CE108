@@ -41,6 +41,7 @@ from ce108.services import (
     record_login_event,
     schedule_review,
     set_target_exam_date,
+    set_user_password,
     start_diagnostic,
 )
 
@@ -226,6 +227,11 @@ class TestCore(unittest.TestCase):
         create_beta_student('beta2@example.com', 'tester1234', '外部β2', db_path=self.db)
         with self.assertRaises(ValueError):
             create_beta_student('BETA2@example.com', 'tester1234', '外部β2 duplicate', db_path=self.db)
+
+    def test_set_user_password_rotates_demo_admin_password(self):
+        set_user_password('admin@ce108.local', 'new-admin-pass', self.db)
+        self.assertIsNone(authenticate_user('admin@ce108.local', 'demo1234', self.db))
+        self.assertEqual(authenticate_user('admin@ce108.local', 'new-admin-pass', self.db)['role'], 'admin')
 
     def test_unconfirmed_question_cannot_be_published(self):
         with self.assertRaises(ValueError):

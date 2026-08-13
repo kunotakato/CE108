@@ -28,6 +28,22 @@ python scripts/create_tester_account.py \
   --display-name 外部β1
 ```
 
+## Rotate Demo Operator Passwords
+
+公開APIではデモ管理者・教員パスワードをそのまま使わないでください。Render Shellで次を実行し、管理者と教員のパスワードを変更します。
+
+```bash
+python scripts/set_user_password.py \
+  --email admin@ce108.local \
+  --password replace-with-strong-admin-password
+
+python scripts/set_user_password.py \
+  --email teacher@ce108.local \
+  --password replace-with-strong-teacher-password
+```
+
+変更後のパスワードはGitHub、README、チャット履歴へ保存しないでください。
+
 管理者APIで作る場合:
 
 ```bash
