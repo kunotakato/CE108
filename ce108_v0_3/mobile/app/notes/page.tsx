@@ -25,6 +25,32 @@ export default function NotesPage() {
   const canGenerate = content.trim().length >= 20 && !loading;
   const answeredCount = useMemo(() => questions.filter((question) => question.answered).length, [questions]);
 
+  async function handleFileChange(file: File | null) {
+    if (!file) return;
+    setError("");
+    const lowerName = file.name.toLowerCase();
+    const isTextFile =
+      file.type.startsWith("text/") ||
+      lowerName.endsWith(".txt") ||
+      lowerName.endsWith(".md") ||
+      lowerName.endsWith(".csv");
+    if (!isTextFile) {
+      setError("写真・PDFの読み取りは次の段階で対応予定です。今は.txt、.md、.csvの学習メモを読み込めます。");
+      return;
+    }
+    if (file.size > 20000) {
+      setError("v0.4.3では20KB以内のテキストファイルを読み込めます。長いノートは必要な部分だけにしてください。");
+      return;
+    }
+    try {
+      const text = await file.text();
+      setTitle(file.name.replace(/\.[^.]+$/, "") || "読み込みノート");
+      setContent(text);
+    } catch {
+      setError("ファイルを読み込めませんでした。文字コードをUTF-8にして再度試してください。");
+    }
+  }
+
   async function handleGenerate() {
     const token = getToken();
     if (!token) {
@@ -102,6 +128,10 @@ export default function NotesPage() {
             />
           </label>
           <label className="field">
+            <span>ファイルから読み込む</span>
+            <input accept=".txt,.md,.csv,text/plain,text/markdown,text/csv,image/*,application/pdf" type="file" onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)} />
+          </label>
+          <label className="field">
             <span>作成する問題数</span>
             <input
               inputMode="numeric"
@@ -115,7 +145,7 @@ export default function NotesPage() {
           <button className="primary-button" disabled={!canGenerate} type="button" onClick={handleGenerate}>
             {loading ? "作成中" : "ノートから問題を作る"}
           </button>
-          <p className="muted">v0.4.2では外部AI APIを使わず、ローカルの重要文抽出で生成します。公式過去問ではなく復習用オリジナル問題です。生成内容は誤る可能性があるため、解説とノートを照合してください。</p>
+          <p className="muted">v0.4.3では外部AI APIを使わず、ローカルの重要文抽出で生成します。公式過去問ではなく復習用オリジナル問題です。生成内容は誤る可能性があるため、解説とノートを照合してください。写真・PDFのOCRは次の段階で対応予定です。</p>
         </section>
         {error ? <ErrorState message={error} /> : null}
         {questions.length ? (

@@ -24,9 +24,10 @@ Render Shellまたはローカルで実行します。
 cd ce108_v0_3
 python scripts/create_tester_account.py \
   --email beta1@example.com \
-  --password replace-with-8-or-more-chars \
   --display-name 外部β1
 ```
+
+`--password`を省略すると、Shell上でパスワードを非表示入力できます。各テスターが決めたパスワードを管理者が設定する場合も、コマンド履歴へ残さないため省略形式を使ってください。
 
 ## Rotate Demo Operator Passwords
 
@@ -34,12 +35,10 @@ python scripts/create_tester_account.py \
 
 ```bash
 python scripts/set_user_password.py \
-  --email admin@ce108.local \
-  --password replace-with-strong-admin-password
+  --email admin@ce108.local
 
 python scripts/set_user_password.py \
-  --email teacher@ce108.local \
-  --password replace-with-strong-teacher-password
+  --email teacher@ce108.local
 ```
 
 変更後のパスワードはGitHub、README、チャット履歴へ保存しないでください。

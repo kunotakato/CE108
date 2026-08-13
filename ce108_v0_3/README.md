@@ -209,9 +209,10 @@ NEXT_PUBLIC_API_BASE_URL=https://your-api.example.com
 ```bash
 python scripts/create_tester_account.py \
   --email beta1@example.com \
-  --password replace-with-8-or-more-chars \
   --display-name 外部β1
 ```
+
+`--password`を省略すると、Shell上でパスワードを非表示入力できます。
 
 公開環境では、管理者API`POST /api/admin/tester-students`からも同じ学生アカウントを作成できます。
 
