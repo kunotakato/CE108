@@ -179,6 +179,8 @@ export default function NotesPage() {
                 <h3 className={answered.choice_feedback?.some((choice) => choice.selected && choice.is_correct) ? "correct" : "incorrect"}>
                   {answered.choice_feedback?.some((choice) => choice.selected && choice.is_correct) ? "正解です" : "復習しましょう"}
                 </h3>
+                {answered.answer_statistics ? <span className="pill">{answered.answer_statistics.label}</span> : null}
+                {answered.learning_point ? <p className="lead-small">{answered.learning_point}</p> : null}
                 <p className="explanation">{answered.explanation}</p>
                 <div className="choice-feedback-list">
                   {answered.choice_feedback?.map((choice) => (

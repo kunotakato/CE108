@@ -81,6 +81,13 @@ export type AnswerResult = {
     numeric_answer?: number | null;
     choices?: Array<Choice & { is_correct?: number; explanation?: string | null }>;
     choice_feedback?: Array<Choice & { is_correct?: boolean; selected?: boolean; explanation?: string | null; feedback_label?: string }>;
+    learning_point?: string;
+    answer_statistics?: {
+      total_answers: number;
+      correct_answers: number;
+      correct_rate: number | null;
+      label: string;
+    };
   };
   related_questions?: Array<{
     id: number;
@@ -243,4 +250,11 @@ export type NoteQuestion = {
   explanation?: string;
   correct_code?: string;
   choice_feedback?: Array<Choice & { is_correct: boolean; selected?: boolean; explanation: string }>;
+  learning_point?: string;
+  answer_statistics?: {
+    total_answers: number;
+    correct_answers: number;
+    correct_rate: number | null;
+    label: string;
+  };
 };

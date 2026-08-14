@@ -157,6 +157,12 @@ h3 {
   color: var(--muted);
 }
 
+.lead-small {
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
 .stack {
   display: grid;
   gap: 14px;

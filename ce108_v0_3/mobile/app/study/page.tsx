@@ -203,6 +203,13 @@ function StudyPageContent() {
         {result ? (
           <section className="panel stack">
             <h2 className={result.is_correct ? "correct" : "incorrect"}>{result.is_correct ? "正解です" : "復習しましょう"}</h2>
+            {result.question.learning_point || result.question.answer_statistics ? (
+              <div className="pill-row">
+                {result.question.learning_point ? <span className="pill">学習ポイント</span> : null}
+                {result.question.answer_statistics ? <span className="pill">{result.question.answer_statistics.label}</span> : null}
+              </div>
+            ) : null}
+            {result.question.learning_point ? <p className="lead-small">{result.question.learning_point}</p> : null}
             <div className="explanation">
               <p>{result.question.explanation_standard || result.question.explanation_short || "解説は登録されていません。"}</p>
               <p className="muted">復習日: {result.review_date}</p>

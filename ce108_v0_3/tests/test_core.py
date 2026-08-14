@@ -92,10 +92,14 @@ class TestCore(unittest.TestCase):
         wrong = next(c['choice_code'] for c in q['choices'] if c['choice_code'] not in q['correct_codes'])
         result = record_answer(self.student['id'], q['id'], [wrong], None, '迷った', 40, 'test', db_path=self.db)
         self.assertIn('choice_feedback', result['question'])
+        self.assertIn('learning_point', result['question'])
+        self.assertIn('answer_statistics', result['question'])
+        self.assertEqual(result['question']['answer_statistics']['total_answers'], 1)
         selected_feedback = [c for c in result['question']['choice_feedback'] if c['selected']]
         self.assertTrue(selected_feedback)
         self.assertFalse(selected_feedback[0]['is_correct'])
         self.assertTrue(selected_feedback[0]['explanation'])
+        self.assertIn('正答の', selected_feedback[0]['explanation'])
         self.assertIn('related_questions', result)
 
     def test_numeric_tolerance(self):
@@ -144,6 +148,9 @@ class TestCore(unittest.TestCase):
         result = answer_note_question(self.student['id'], question['id'], '1', 'たぶん分かる', 20, self.db)
         self.assertTrue(result['is_correct'])
         self.assertIn('choice_feedback', result['question'])
+        self.assertIn('learning_point', result['question'])
+        self.assertEqual(result['question']['answer_statistics']['total_answers'], 1)
+        self.assertIn('本文の中心', result['question']['choice_feedback'][0]['explanation'])
 
     def test_note_upload_text_extraction(self):
         result = extract_note_upload_text(self.student['id'], 'lecture.md', 'text/markdown', '人工呼吸管理ではPEEPにより肺胞虚脱を抑える。PaCO2上昇は肺胞換気不足を示唆する。'.encode('utf-8'), self.db)

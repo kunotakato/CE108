@@ -119,18 +119,23 @@ def related_questions(user_id:int,question_id:int,limit:int=3,db_path:Path|str=D
 def _choice_feedback(q:dict,selected_codes:list[str]|None):
     selected=set(selected_codes or [])
     correct=set(q.get('correct_codes') or [])
+    correct_text='・'.join(c['choice_text'] for c in q.get('choices',[]) if c.get('choice_code') in correct) or '正答'
     items=[]
     for choice in q.get('choices',[]):
         d=dict(choice)
         d['selected']=d['choice_code'] in selected
         d['is_correct']=bool(d.get('is_correct'))
-        if not (d.get('explanation') or '').strip():
+        explanation=(d.get('explanation') or '').strip()
+        if (not d['is_correct']) and ('本問の正答ではありません' in explanation or 'この選択肢は正答ではありません' in explanation):
+            explanation=f'{d["choice_text"]}は、正答の「{correct_text}」と役割・条件が異なります。どの語が正答根拠とずれているかを確認しましょう。'
+        if not explanation:
             if d['is_correct']:
-                d['explanation']=q.get('explanation_short') or 'この選択肢が正解です。'
+                explanation=q.get('explanation_short') or 'この選択肢が正解です。'
             elif d['selected']:
-                d['explanation']='この選択肢は本問の正答ではありません。正答の根拠と比較して、どの条件がずれているかを確認しましょう。'
+                explanation=f'{d["choice_text"]}は、正答の「{correct_text}」と役割・条件が異なります。どの語が正答根拠とずれているかを確認しましょう。'
             else:
-                d['explanation']='この選択肢は正答ではありません。用語の意味と適用場面を正答と区別して覚えましょう。'
+                explanation=f'{d["choice_text"]}は正答の「{correct_text}」ではありません。用語の意味と適用場面を区別して覚えましょう。'
+        d['explanation']=explanation
         if d['choice_code'] in correct:
             d['feedback_label']='正答'
         elif d['choice_code'] in selected:
@@ -139,6 +144,23 @@ def _choice_feedback(q:dict,selected_codes:list[str]|None):
             d['feedback_label']='誤答'
         items.append(d)
     return items
+
+def _question_learning_point(q:dict)->str:
+    subject=q.get('subject_name') or 'この分野'
+    topic=q.get('topic_name') or '関連テーマ'
+    importance=int(q.get('importance') or 3)
+    standard=(q.get('explanation_standard') or q.get('explanation_short') or '').strip()
+    cue=standard[:70]+'...' if len(standard)>70 else standard
+    if cue:
+        return f'{subject}「{topic}」で、正答根拠と誤答のずれを説明できるようにします。重要度{importance}/5。要点: {cue}'
+    return f'{subject}「{topic}」で、正答根拠と誤答のずれを説明できるようにします。重要度{importance}/5。'
+
+def _answer_statistics(question_id:int,db_path:Path|str=DB_PATH):
+    r=fetch_one('SELECT COUNT(*) total,COALESCE(SUM(is_correct),0) correct FROM answer_history WHERE question_id=?',(question_id,),db_path)
+    total=int(r['total'] or 0);correct=int(r['correct'] or 0)
+    rate=round(correct/total*100,1) if total else None
+    label=f'β内正答率 {rate}%（{total}件）' if total else 'β内正答率はまだ集計中'
+    return {'total_answers':total,'correct_answers':correct,'correct_rate':rate,'label':label}
 
 def check_answer(q:dict,selected_codes:list[str]|None=None,numeric_answer:float|None=None)->bool:
     if q['question_type']=='numeric':
@@ -175,6 +197,8 @@ def record_answer(user_id:int,question_id:int,selected_codes:list[str]|None,nume
     execute('''INSERT INTO answer_history(user_id,question_id,selected_answer,numeric_answer,is_correct,confidence_level,response_time_seconds,answer_mode,session_id,answered_at) VALUES(?,?,?,?,?,?,?,?,?,?)''',(user_id,question_id,json.dumps(selected_codes or [],ensure_ascii=False),numeric_answer,int(correct),confidence,max(0,int(response_time_seconds)),answer_mode,session_id,utc_now()),db_path)
     update_mastery(user_id,question_id,correct,confidence,response_time_seconds,db_path);review=schedule_review(user_id,question_id,correct,confidence,int(q['importance']),db_path)
     q['choice_feedback']=_choice_feedback(q,selected_codes)
+    q['learning_point']=_question_learning_point(q)
+    q['answer_statistics']=_answer_statistics(question_id,db_path)
     return {'is_correct':correct,'review_date':review,'question':q,'related_questions':related_questions(user_id,question_id,db_path=db_path)}
 
 def _count(minutes:int)->int:return max(3,min(20,round(minutes/3)))
@@ -466,11 +490,11 @@ def _note_question(sentence:str,topic_code:str,index:int)->dict[str,Any]:
     clean=sentence[:120]
     choices=['ノート本文の重要点として正しい','似た用語だが本文の主旨と異なる','原因と結果を逆にしている','別分野の知識を混同している','本文では判断できない内容を断定している']
     explanations=[
-        f'本文では「{clean}」が重要点として扱われています。',
-        '似た語を選んでいても、本文の主張・条件と一致していません。',
-        '因果関係を逆にすると、臨床判断や装置設定を誤りやすくなります。',
-        '近い領域の知識でも、本問の本文で問われている分野とは異なります。',
-        'ノートに根拠がない断定は、復習問題では正答にしません。',
+        f'本文の中心は「{clean}」です。この文を自分の言葉で説明できることが学習目標です。',
+        f'この選択肢は用語だけ近くても、本文の中心である「{clean}」の条件や結論を示していません。',
+        f'本文は「{clean}」という流れで説明しています。原因と結果を逆にすると判断手順が崩れます。',
+        f'別分野の知識を混ぜると、本文で確認したい「{clean}」から外れます。まず本文内の根拠で判断します。',
+        f'本文に書かれていない内容を断定すると、ノートから確認できる根拠を超えます。復習では根拠のある範囲に絞ります。',
     ]
     return {
         'question_type':'single',
@@ -478,9 +502,16 @@ def _note_question(sentence:str,topic_code:str,index:int)->dict[str,Any]:
         'choices':choices,
         'correct_code':'1',
         'choice_explanations':explanations,
-        'explanation':f'この問題はあなたのノートから生成しました。重要と判断した文は「{clean}」です。既存の国家試験問題ではなく、復習用のオリジナル問題です。',
+        'explanation':f'この問題で学ぶことは、ノートの重要文「{clean}」を根拠に、正答と誤答のずれを説明できるようにすることです。既存の国家試験問題ではなく、復習用のオリジナル問題です。',
         'topic_code':topic_code,
     }
+
+def _note_answer_statistics(question_id:int,db_path:Path|str=DB_PATH):
+    r=fetch_one('SELECT COUNT(*) total,COALESCE(SUM(is_correct),0) correct FROM note_question_answers WHERE note_question_id=?',(question_id,),db_path)
+    total=int(r['total'] or 0);correct=int(r['correct'] or 0)
+    rate=round(correct/total*100,1) if total else None
+    label=f'ノート問題の正答率 {rate}%（{total}件）' if total else 'ノート問題の正答率はまだ集計中'
+    return {'total_answers':total,'correct_answers':correct,'correct_rate':rate,'label':label}
 
 def generate_note_questions(user_id:int,note_id:int,count:int=5,db_path:Path|str=DB_PATH):
     note=fetch_one('SELECT * FROM student_notes WHERE id=? AND user_id=?',(note_id,user_id),db_path)
@@ -498,9 +529,9 @@ def generate_note_questions(user_id:int,note_id:int,count:int=5,db_path:Path|str
                 continue
             qid=conn.execute('''INSERT INTO note_generated_questions(note_id,user_id,question_type,question_text,choices,correct_code,choice_explanations,explanation,topic_code,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,'active',?)''',(note_id,user_id,draft['question_type'],draft['question_text'],json.dumps(draft['choices'],ensure_ascii=False),draft['correct_code'],json.dumps(draft['choice_explanations'],ensure_ascii=False),draft['explanation'],draft['topic_code'],utc_now())).lastrowid
             created.append(dict(conn.execute('SELECT * FROM note_generated_questions WHERE id=?',(qid,)).fetchone()))
-    return {'note_id':note_id,'generated_count':len(created),'questions':[format_note_question(q,answered=False) for q in created]}
+    return {'note_id':note_id,'generated_count':len(created),'questions':[format_note_question(q,answered=False,db_path=db_path) for q in created]}
 
-def format_note_question(row:dict|Any,answered:bool=False,include_answer:bool=False):
+def format_note_question(row:dict|Any,answered:bool=False,include_answer:bool=False,db_path:Path|str=DB_PATH):
     q=dict(row)
     choices=json.loads(q.pop('choices'))
     explanations=json.loads(q.pop('choice_explanations'))
@@ -509,6 +540,8 @@ def format_note_question(row:dict|Any,answered:bool=False,include_answer:bool=Fa
     if include_answer:
         q['correct_code']=q.get('correct_code','1')
         q['choice_feedback']=[{**choice,'is_correct':choice['choice_code']==q['correct_code'],'explanation':explanations[i] if i<len(explanations) else ''} for i,choice in enumerate(q['choices'])]
+        q['learning_point']='ノート本文の重要文を根拠に、正答と誤答のどこがずれているかを説明できるようにします。'
+        q['answer_statistics']=_note_answer_statistics(q['id'],db_path)
     else:
         q.pop('correct_code',None);q.pop('explanation',None)
     return q
@@ -517,12 +550,12 @@ def list_note_questions(user_id:int,note_id:int,db_path:Path|str=DB_PATH):
     note=fetch_one('SELECT id FROM student_notes WHERE id=? AND user_id=?',(note_id,user_id),db_path)
     if not note:raise ValueError('ノートが見つかりません。')
     rows=fetch_all('''SELECT q.*,EXISTS(SELECT 1 FROM note_question_answers a WHERE a.user_id=? AND a.note_question_id=q.id) answered FROM note_generated_questions q WHERE q.user_id=? AND q.note_id=? AND q.status='active' ORDER BY q.id''',(user_id,user_id,note_id),db_path)
-    return [format_note_question(r,answered=bool(r['answered'])) for r in rows]
+    return [format_note_question(r,answered=bool(r['answered']),db_path=db_path) for r in rows]
 
 def get_note_question(user_id:int,question_id:int,db_path:Path|str=DB_PATH):
     row=fetch_one("SELECT * FROM note_generated_questions WHERE id=? AND user_id=? AND status='active'",(question_id,user_id),db_path)
     if not row:raise ValueError('ノート問題が見つかりません。')
-    return format_note_question(row)
+    return format_note_question(row,db_path=db_path)
 
 def answer_note_question(user_id:int,question_id:int,selected_code:str,confidence:str,seconds:int,db_path:Path|str=DB_PATH):
     row=fetch_one("SELECT * FROM note_generated_questions WHERE id=? AND user_id=? AND status='active'",(question_id,user_id),db_path)
@@ -531,7 +564,7 @@ def answer_note_question(user_id:int,question_id:int,selected_code:str,confidenc
     if not selected:raise ValueError('選択肢を選んでください。')
     correct=selected==row['correct_code']
     execute('INSERT INTO note_question_answers(user_id,note_question_id,selected_code,is_correct,confidence_level,response_time_seconds,answered_at) VALUES(?,?,?,?,?,?,?)',(user_id,question_id,selected,int(correct),confidence,max(0,int(seconds)),utc_now()),db_path)
-    q=format_note_question(row,include_answer=True)
+    q=format_note_question(row,include_answer=True,db_path=db_path)
     for choice in q['choice_feedback']:choice['selected']=choice['choice_code']==selected
     return {'is_correct':correct,'question':q}
 
