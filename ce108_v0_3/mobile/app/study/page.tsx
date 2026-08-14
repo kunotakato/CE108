@@ -9,6 +9,7 @@ import { ChoiceCard } from "@/components/ChoiceCard";
 import { ConfidenceSelector } from "@/components/ConfidenceSelector";
 import { ProgressHeader } from "@/components/ProgressHeader";
 import { EmptyState, ErrorState, LoadingState } from "@/components/StateViews";
+import { VisualAidCard } from "@/components/VisualAid";
 import { getFocusPlan, getQuestion, getToday, submitAnswer } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { addSessionAnswer, getSession, resetSession } from "@/lib/studySession";
@@ -210,6 +211,7 @@ function StudyPageContent() {
               </div>
             ) : null}
             {result.question.learning_point ? <p className="lead-small">{result.question.learning_point}</p> : null}
+            <VisualAidCard aid={result.question.visual_aid} />
             <div className="explanation">
               <p>{result.question.explanation_standard || result.question.explanation_short || "解説は登録されていません。"}</p>
               <p className="muted">復習日: {result.review_date}</p>

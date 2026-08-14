@@ -414,6 +414,80 @@ h3 {
   padding-left: 12px;
 }
 
+.visual-aid {
+  background: #fbfdfb;
+  border: 1px solid rgba(22, 78, 65, 0.18);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.visual-aid-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.visual-aid-header h3 {
+  color: var(--primary);
+}
+
+.visual-aid-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.visual-aid-step-wrap {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.visual-aid-step {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.visual-aid-step span {
+  align-items: center;
+  background: var(--primary);
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  flex: 0 0 24px;
+  font-size: 12px;
+  font-weight: 900;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.visual-aid-step strong {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.visual-aid-arrow {
+  color: var(--primary);
+  font-weight: 900;
+}
+
+.visual-aid-summary {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
 .choice-feedback-list {
   display: grid;
   gap: 8px;

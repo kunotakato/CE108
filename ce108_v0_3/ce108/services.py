@@ -162,6 +162,23 @@ def _answer_statistics(question_id:int,db_path:Path|str=DB_PATH):
     label=f'β内正答率 {rate}%（{total}件）' if total else 'β内正答率はまだ集計中'
     return {'total_answers':total,'correct_answers':correct,'correct_rate':rate,'label':label}
 
+def _visual_aid(title:str,kind:str,steps:list[str],summary:str)->dict[str,Any]:
+    return {'title':title,'kind':kind,'steps':steps[:6],'summary':summary}
+
+def _question_visual_aid(q:dict)->dict[str,Any]:
+    text=' '.join(str(q.get(k) or '') for k in ('question_text','explanation_short','explanation_standard','topic_name','subject_name')).lower()
+    if any(k in text for k in ('洞房結節','房室結節','his束','purkinje','刺激伝導')):
+        return _visual_aid('刺激伝導の流れ','flow',['洞房結節','房室結節','His束','右脚・左脚','Purkinje線維'],'心臓の興奮は上流から下流へ順に伝わります。節・束・脚・線維の位置関係を流れで覚えます。')
+    if any(k in text for k in ('肺胞','paco2','二酸化炭素','酸素','換気','拡散')):
+        return _visual_aid('肺胞でのガス交換','exchange',['肺胞気','分圧差','肺胞膜','毛細血管','換気でCO2排出'],'肺胞と血液の間では、分圧差に沿って酸素と二酸化炭素が移動します。換気不足ではCO2が上がりやすくなります。')
+    if any(k in text for k in ('腎小体','糸球体','原尿','濾過','腎')):
+        return _visual_aid('腎小体の濾過','flow',['輸入細動脈','糸球体','濾過膜','Bowman嚢','原尿'],'血液から濾過膜を通って原尿が作られる流れを押さえると、腎機能の問題を整理しやすくなります。')
+    if any(k in text for k in ('透析','限外濾過','除水','透析膜','シャント')):
+        return _visual_aid('透析で起きる移動','exchange',['血液側','透析膜','透析液側','拡散','限外濾過'],'小分子は濃度差で拡散し、水分は圧差で限外濾過されます。何が何の差で動くかを分けて覚えます。')
+    if any(k in text for k in ('ヘモグロビン','酸素運搬','血液')):
+        return _visual_aid('酸素運搬の見取り図','flow',['肺胞','赤血球','ヘモグロビン','動脈血','組織'],'酸素は肺で血液に取り込まれ、主にヘモグロビンと結合して組織へ運ばれます。')
+    return _visual_aid('正答根拠の見取り図','map',['問題文の条件','正答根拠','誤答との差分','次に解く関連問題'],'文章だけで終わらせず、条件・根拠・誤答との差分を一列に並べて確認します。')
+
 def check_answer(q:dict,selected_codes:list[str]|None=None,numeric_answer:float|None=None)->bool:
     if q['question_type']=='numeric':
         return numeric_answer is not None and math.isclose(float(numeric_answer),float(q['numeric_answer']),rel_tol=float(q.get('numeric_tolerance') or .01),abs_tol=float(q.get('numeric_tolerance') or .01))
@@ -199,6 +216,7 @@ def record_answer(user_id:int,question_id:int,selected_codes:list[str]|None,nume
     q['choice_feedback']=_choice_feedback(q,selected_codes)
     q['learning_point']=_question_learning_point(q)
     q['answer_statistics']=_answer_statistics(question_id,db_path)
+    q['visual_aid']=_question_visual_aid(q)
     return {'is_correct':correct,'review_date':review,'question':q,'related_questions':related_questions(user_id,question_id,db_path=db_path)}
 
 def _count(minutes:int)->int:return max(3,min(20,round(minutes/3)))
@@ -513,6 +531,14 @@ def _note_answer_statistics(question_id:int,db_path:Path|str=DB_PATH):
     label=f'ノート問題の正答率 {rate}%（{total}件）' if total else 'ノート問題の正答率はまだ集計中'
     return {'total_answers':total,'correct_answers':correct,'correct_rate':rate,'label':label}
 
+def _note_visual_aid(q:dict)->dict[str,Any]:
+    topic=(q.get('topic_code') or '').upper()
+    if topic in {'SUP-RESP','MED-ANAT'}:
+        return _visual_aid('ノートから作った呼吸・生理マップ','exchange',['ノート本文','重要文','体内で起きる変化','正答根拠','誤答との差分'],'メモの一文を、体内の変化や因果関係へつなげて理解します。')
+    if topic=='SUP-HD':
+        return _visual_aid('ノートから作った透析マップ','exchange',['ノート本文','血液側','透析膜','透析液側','移動の理由'],'透析のメモは、どちら側からどちら側へ何が動くかを図で分けます。')
+    return _visual_aid('ノート重要文マップ','map',['ノート本文','AIが選んだ重要文','正答根拠','誤答との差分'],'ノートの重要文を出発点に、正答と誤答の違いを短い流れで確認します。')
+
 def generate_note_questions(user_id:int,note_id:int,count:int=5,db_path:Path|str=DB_PATH):
     note=fetch_one('SELECT * FROM student_notes WHERE id=? AND user_id=?',(note_id,user_id),db_path)
     if not note:raise ValueError('ノートが見つかりません。')
@@ -542,6 +568,7 @@ def format_note_question(row:dict|Any,answered:bool=False,include_answer:bool=Fa
         q['choice_feedback']=[{**choice,'is_correct':choice['choice_code']==q['correct_code'],'explanation':explanations[i] if i<len(explanations) else ''} for i,choice in enumerate(q['choices'])]
         q['learning_point']='ノート本文の重要文を根拠に、正答と誤答のどこがずれているかを説明できるようにします。'
         q['answer_statistics']=_note_answer_statistics(q['id'],db_path)
+        q['visual_aid']=_note_visual_aid(q)
     else:
         q.pop('correct_code',None);q.pop('explanation',None)
     return q

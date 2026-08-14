@@ -70,6 +70,13 @@ export type AnswerPayload = {
   answer_mode: "daily";
 };
 
+export type VisualAid = {
+  title: string;
+  kind: "flow" | "exchange" | "map";
+  steps: string[];
+  summary: string;
+};
+
 export type AnswerResult = {
   is_correct: boolean;
   review_date: string;
@@ -88,6 +95,7 @@ export type AnswerResult = {
       correct_rate: number | null;
       label: string;
     };
+    visual_aid?: VisualAid;
   };
   related_questions?: Array<{
     id: number;
@@ -257,4 +265,5 @@ export type NoteQuestion = {
     correct_rate: number | null;
     label: string;
   };
+  visual_aid?: VisualAid;
 };

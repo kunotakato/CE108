@@ -94,7 +94,9 @@ class TestCore(unittest.TestCase):
         self.assertIn('choice_feedback', result['question'])
         self.assertIn('learning_point', result['question'])
         self.assertIn('answer_statistics', result['question'])
+        self.assertIn('visual_aid', result['question'])
         self.assertEqual(result['question']['answer_statistics']['total_answers'], 1)
+        self.assertGreaterEqual(len(result['question']['visual_aid']['steps']), 3)
         selected_feedback = [c for c in result['question']['choice_feedback'] if c['selected']]
         self.assertTrue(selected_feedback)
         self.assertFalse(selected_feedback[0]['is_correct'])
@@ -145,11 +147,14 @@ class TestCore(unittest.TestCase):
         text = json.dumps(question, ensure_ascii=False)
         self.assertNotIn('correct_code', text)
         self.assertNotIn('choice_feedback', text)
+        self.assertNotIn('visual_aid', text)
         result = answer_note_question(self.student['id'], question['id'], '1', 'たぶん分かる', 20, self.db)
         self.assertTrue(result['is_correct'])
         self.assertIn('choice_feedback', result['question'])
         self.assertIn('learning_point', result['question'])
+        self.assertIn('visual_aid', result['question'])
         self.assertEqual(result['question']['answer_statistics']['total_answers'], 1)
+        self.assertGreaterEqual(len(result['question']['visual_aid']['steps']), 3)
         self.assertIn('本文の中心', result['question']['choice_feedback'][0]['explanation'])
 
     def test_note_upload_text_extraction(self):

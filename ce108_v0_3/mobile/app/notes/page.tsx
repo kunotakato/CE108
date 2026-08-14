@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ConfidenceSelector } from "@/components/ConfidenceSelector";
 import { EmptyState, ErrorState } from "@/components/StateViews";
+import { VisualAidCard } from "@/components/VisualAid";
 import { answerNoteQuestion, createNote, extractNoteText, generateNoteQuestions } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import type { NoteQuestion } from "@/lib/types";
@@ -181,6 +182,7 @@ export default function NotesPage() {
                 </h3>
                 {answered.answer_statistics ? <span className="pill">{answered.answer_statistics.label}</span> : null}
                 {answered.learning_point ? <p className="lead-small">{answered.learning_point}</p> : null}
+                <VisualAidCard aid={answered.visual_aid} />
                 <p className="explanation">{answered.explanation}</p>
                 <div className="choice-feedback-list">
                   {answered.choice_feedback?.map((choice) => (
