@@ -32,6 +32,7 @@ from ce108.services import (
     get_teacher_support_summary,
     get_study_strategy,
     create_student_note,
+    extract_note_upload_text,
     generate_note_questions,
     answer_note_question,
     record_answer,
@@ -143,6 +144,16 @@ class TestCore(unittest.TestCase):
         result = answer_note_question(self.student['id'], question['id'], '1', 'たぶん分かる', 20, self.db)
         self.assertTrue(result['is_correct'])
         self.assertIn('choice_feedback', result['question'])
+
+    def test_note_upload_text_extraction(self):
+        result = extract_note_upload_text(self.student['id'], 'lecture.md', 'text/markdown', '人工呼吸管理ではPEEPにより肺胞虚脱を抑える。PaCO2上昇は肺胞換気不足を示唆する。'.encode('utf-8'), self.db)
+        self.assertEqual(result['source_type'], 'uploaded_text')
+        self.assertIn('人工呼吸管理', result['text'])
+
+    def test_note_upload_image_requires_ocr_provider(self):
+        with self.assertRaises(ValueError) as ctx:
+            extract_note_upload_text(self.student['id'], 'note.png', 'image/png', b'\x89PNG\r\n', self.db)
+        self.assertIn('OCR', str(ctx.exception))
 
     def test_focus_plan_modes(self):
         medical = get_focus_plan(self.student['id'], 'medical', 5, self.db)
@@ -385,6 +396,20 @@ class TestApi(unittest.TestCase):
         res = self.client.post(f"/api/note-questions/{q['id']}/answer", headers={'Authorization': f'Bearer {token}'}, json={'selected_code': '1', 'confidence': 'たぶん分かる', 'response_time_seconds': 10})
         self.assertEqual(res.status_code, 200, res.text)
         self.assertTrue(res.json()['is_correct'])
+
+    def test_note_extract_api_reads_text_file(self):
+        token = self._token()
+        res = self.client.post('/api/notes/extract', headers={'Authorization': f'Bearer {token}'}, files={'file': ('memo.txt', '血液透析では拡散と限外濾過を理解する。除水設定は循環動態に注意する。'.encode('utf-8'), 'text/plain')})
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertEqual(body['source_type'], 'uploaded_text')
+        self.assertIn('血液透析', body['text'])
+
+    def test_note_extract_api_rejects_image_without_ocr_provider(self):
+        token = self._token()
+        res = self.client.post('/api/notes/extract', headers={'Authorization': f'Bearer {token}'}, files={'file': ('memo.png', b'\x89PNG\r\n', 'image/png')})
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('OCR', res.text)
 
     def test_teacher_support_api(self):
         token = self._token('teacher@ce108.local')

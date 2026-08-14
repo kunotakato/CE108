@@ -221,6 +221,14 @@ export type StudentNote = {
   generated_question_count: number;
 };
 
+export type NoteExtractResult = {
+  filename: string;
+  content_type: string;
+  source_type: string;
+  text: string;
+  warning?: string;
+};
+
 export type NoteQuestion = {
   id: number;
   note_id: number;

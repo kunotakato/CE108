@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ConfidenceSelector } from "@/components/ConfidenceSelector";
 import { EmptyState, ErrorState } from "@/components/StateViews";
-import { answerNoteQuestion, createNote, generateNoteQuestions } from "@/lib/api";
+import { answerNoteQuestion, createNote, extractNoteText, generateNoteQuestions } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import type { NoteQuestion } from "@/lib/types";
 
@@ -12,6 +12,7 @@ export default function NotesPage() {
   const startedAt = useRef(Date.now());
   const [title, setTitle] = useState("今日の授業ノート");
   const [content, setContent] = useState("");
+  const [sourceType, setSourceType] = useState("manual_note");
   const [count, setCount] = useState(5);
   const [questions, setQuestions] = useState<NoteQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -20,6 +21,7 @@ export default function NotesPage() {
   const [answered, setAnswered] = useState<NoteQuestion | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const current = questions[currentIndex];
   const canGenerate = content.trim().length >= 20 && !loading;
@@ -27,27 +29,24 @@ export default function NotesPage() {
 
   async function handleFileChange(file: File | null) {
     if (!file) return;
+    const token = getToken();
+    if (!token) {
+      setError("ログイン情報が見つかりません。ログインし直してください。");
+      return;
+    }
+    setLoading(true);
     setError("");
-    const lowerName = file.name.toLowerCase();
-    const isTextFile =
-      file.type.startsWith("text/") ||
-      lowerName.endsWith(".txt") ||
-      lowerName.endsWith(".md") ||
-      lowerName.endsWith(".csv");
-    if (!isTextFile) {
-      setError("写真・PDFの読み取りは次の段階で対応予定です。今は.txt、.md、.csvの学習メモを読み込めます。");
-      return;
-    }
-    if (file.size > 20000) {
-      setError("v0.4.3では20KB以内のテキストファイルを読み込めます。長いノートは必要な部分だけにしてください。");
-      return;
-    }
+    setNotice("");
     try {
-      const text = await file.text();
+      const extracted = await extractNoteText(token, file);
       setTitle(file.name.replace(/\.[^.]+$/, "") || "読み込みノート");
-      setContent(text);
-    } catch {
-      setError("ファイルを読み込めませんでした。文字コードをUTF-8にして再度試してください。");
+      setContent(extracted.text);
+      setSourceType(extracted.source_type || "uploaded_text");
+      setNotice(extracted.warning || "ファイルを読み込みました。本文を確認してから問題を作成してください。");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ファイルを読み込めませんでした。");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -64,7 +63,7 @@ export default function NotesPage() {
     setAnswered(null);
     setSelected("");
     try {
-      const note = await createNote(token, { title, content, source_type: "manual_note" });
+      const note = await createNote(token, { title, content, source_type: sourceType });
       const generated = await generateNoteQuestions(token, note.note_id, count);
       setQuestions(generated.questions);
       startedAt.current = Date.now();
@@ -123,7 +122,10 @@ export default function NotesPage() {
             <textarea
               className="note-textarea"
               value={content}
-              onChange={(event) => setContent(event.target.value)}
+              onChange={(event) => {
+                setContent(event.target.value);
+                setSourceType("manual_note");
+              }}
               placeholder="授業メモ、実習メモ、模試の復習メモを貼り付けてください。"
             />
           </label>
@@ -131,6 +133,7 @@ export default function NotesPage() {
             <span>ファイルから読み込む</span>
             <input accept=".txt,.md,.csv,text/plain,text/markdown,text/csv,image/*,application/pdf" type="file" onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)} />
           </label>
+          {notice ? <p className="muted">{notice}</p> : null}
           <label className="field">
             <span>作成する問題数</span>
             <input
@@ -145,7 +148,7 @@ export default function NotesPage() {
           <button className="primary-button" disabled={!canGenerate} type="button" onClick={handleGenerate}>
             {loading ? "作成中" : "ノートから問題を作る"}
           </button>
-          <p className="muted">v0.4.3では外部AI APIを使わず、ローカルの重要文抽出で生成します。公式過去問ではなく復習用オリジナル問題です。生成内容は誤る可能性があるため、解説とノートを照合してください。写真・PDFのOCRは次の段階で対応予定です。</p>
+          <p className="muted">v0.4.4では外部AI APIを使わず、CE108内の重要文抽出で生成します。公式過去問ではなく復習用オリジナル問題です。生成内容は誤る可能性があるため、解説とノートを照合してください。写真・PDFのOCRは設計済みですが、本番OCR接続は未有効です。</p>
         </section>
         {error ? <ErrorState message={error} /> : null}
         {questions.length ? (

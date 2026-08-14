@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
-from .config import DB_PATH
+from .config import DB_PATH, NOTE_OCR_MAX_BYTES, NOTE_OCR_PROVIDER
 from .database import connect, execute, fetch_all, fetch_one, utc_now
 
 CONFIDENCE_VALUES={'確実に分かる':1.0,'たぶん分かる':0.82,'迷った':0.58,'勘で答えた':0.35}
@@ -411,6 +411,41 @@ def create_student_note(user_id:int,title:str,content:str,source_type:str='manua
 
 def list_student_notes(user_id:int,db_path:Path|str=DB_PATH):
     return [dict(r) for r in fetch_all('''SELECT n.*,COUNT(q.id) generated_question_count FROM student_notes n LEFT JOIN note_generated_questions q ON q.note_id=n.id WHERE n.user_id=? GROUP BY n.id ORDER BY n.created_at DESC''',(user_id,),db_path)]
+
+TEXT_UPLOAD_EXTENSIONS={'.txt','.md','.markdown','.csv'}
+TEXT_UPLOAD_TYPES={'text/plain','text/markdown','text/csv','application/csv','application/vnd.ms-excel'}
+OCR_UPLOAD_EXTENSIONS={'.png','.jpg','.jpeg','.webp','.heic','.pdf'}
+
+def extract_note_upload_text(user_id:int,filename:str,content_type:str|None,data:bytes,db_path:Path|str=DB_PATH):
+    name=(filename or 'upload').strip()
+    suffix=Path(name).suffix.lower()
+    mime=(content_type or '').split(';')[0].strip().lower()
+    if not data:
+        raise ValueError('ファイルが空です。ノート本文が入ったファイルを選んでください。')
+    if len(data)>NOTE_OCR_MAX_BYTES:
+        mb=max(1,round(NOTE_OCR_MAX_BYTES/1024/1024))
+        raise ValueError(f'ファイルサイズが大きすぎます。{mb}MB以内にしてください。')
+    is_text=mime.startswith('text/') or mime in TEXT_UPLOAD_TYPES or suffix in TEXT_UPLOAD_EXTENSIONS
+    if is_text:
+        try:
+            text=data.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            text=data.decode('utf-8',errors='replace')
+        text=text.replace('\x00','').strip()
+        if len(text)<20:
+            raise ValueError('抽出した本文が短すぎます。20文字以上の学習メモを読み込んでください。')
+        if len(text)>20000:
+            text=text[:20000]
+            warning='20,000文字を超えたため、先頭20,000文字だけを読み込みました。'
+        else:
+            warning=''
+        return {'filename':name,'content_type':mime or 'text/plain','source_type':'uploaded_text','text':text,'warning':warning}
+    is_ocr_target=mime.startswith('image/') or mime=='application/pdf' or suffix in OCR_UPLOAD_EXTENSIONS
+    if is_ocr_target:
+        if NOTE_OCR_PROVIDER in {'', 'disabled', 'none', 'off'}:
+            raise ValueError('写真・PDFのOCR入口は設計済みですが、この環境ではNOTE_OCR_PROVIDERがdisabledのため未有効です。.txt/.md/.csvを使うか、OCR設定後に再試行してください。')
+        raise ValueError(f'NOTE_OCR_PROVIDER={NOTE_OCR_PROVIDER}はまだ接続実装前です。外部AIへ送信する前に、同意文言・保存期間・監査ログを確定してください。')
+    raise ValueError('対応していないファイル形式です。.txt、.md、.csv、写真、PDFを選んでください。')
 
 def _note_topic(content:str)->str:
     lowered=content.lower()

@@ -1,6 +1,6 @@
-# CE108 v0.4.3 First Tester Operations
+# CE108 v0.4.4 OCR/Image AI Design
 
-臨床工学技士国家試験対策のローカル実動プロトタイプです。v0.4では、学生が毎日使い続けるための日次学習体験、復習キュー、教員支援、管理者品質チェックを追加しています。v0.4.3では、最初の外部テスターのログイン活動、回答、フィードバックを管理者が確認できる運用機能を追加しています。
+臨床工学技士国家試験対策のローカル実動プロトタイプです。v0.4では、学生が毎日使い続けるための日次学習体験、復習キュー、教員支援、管理者品質チェックを追加しています。v0.4.4では、ノートAIにファイル抽出APIを追加し、写真・PDF OCRの安全な接続設計を整備しています。
 
 ## 実装済み
 
@@ -88,6 +88,13 @@
 - 管理者APIでβフィードバック一覧・集計を確認可能
 - Streamlit管理画面の「βフィードバック分析」にテスター活動表を追加
 - 日本時間基準で今日の回答完了と連続学習日数を判定
+
+### OCR/Image AI Design v0.4.4
+- ノートAI用の`POST /api/notes/extract`を追加
+- `.txt`、`.md`、`.csv`をFastAPI側で抽出
+- 写真・PDFはアップロード入口と検証を用意
+- `NOTE_OCR_PROVIDER=disabled`では外部AIへ送信せず、理由が分かるエラーを返す
+- OCR本番接続前に、同意文言、保存期間、監査ログ、個人情報入力禁止の運用を確認する設計文書を追加
 
 ## 重要事項
 
@@ -177,6 +184,7 @@ GET  /api/admin/quality
 GET  /api/admin/tester-students/activity
 GET  /api/admin/beta-feedback
 GET  /api/admin/beta-feedback/summary
+POST /api/notes/extract
 POST /api/admin/questions
 POST /api/admin/tester-students
 POST /api/admin/questions/{qid}/approve
@@ -196,6 +204,8 @@ CE108_APP_SECRET=replace-with-a-long-random-secret
 CE108_DB_PATH=/path/to/persistent/ce108.db
 CE108_CORS_ORIGINS=https://your-mobile-app.example.com
 PUBLIC_BASE_URL=https://your-api.example.com
+NOTE_OCR_PROVIDER=disabled
+NOTE_OCR_MAX_BYTES=5242880
 ```
 
 モバイル側の主な環境変数:
@@ -222,9 +232,10 @@ python scripts/create_tester_account.py \
 docs/DEPLOYMENT_PLAN.md
 docs/RENDER_DEPLOYMENT.md
 docs/EXTERNAL_BETA_GUIDE.md
+docs/NOTE_OCR_IMAGE_AI_DESIGN.md
 ```
 
-## Mobile v0.4.2
+## Mobile v0.4.4
 
 学生がスマートフォンで毎日5問を解くためのNext.jsフロントエンドを`mobile/`に追加しています。教員・管理者画面は従来どおりStreamlitを利用します。
 

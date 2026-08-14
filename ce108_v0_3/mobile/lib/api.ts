@@ -7,6 +7,7 @@ import type {
   LearningSummary,
   LoginResponse,
   MasteryRow,
+  NoteExtractResult,
   NoteQuestion,
   Question,
   ReviewQueue,
@@ -133,6 +134,22 @@ export async function createNote(token: string, payload: { title: string; conten
     method: "POST",
     body: payload
   });
+}
+
+export async function extractNoteText(token: string, file: File) {
+  const headers = new Headers();
+  headers.set("Authorization", `Bearer ${token}`);
+  const form = new FormData();
+  form.set("file", file);
+  const response = await fetch(`${API_BASE_URL}/api/notes/extract`, {
+    method: "POST",
+    headers,
+    body: form
+  });
+  if (!response.ok) {
+    throw new ApiError(await parseError(response), response.status);
+  }
+  return response.json() as Promise<NoteExtractResult>;
 }
 
 export async function generateNoteQuestions(token: string, noteId: number, count = 5) {

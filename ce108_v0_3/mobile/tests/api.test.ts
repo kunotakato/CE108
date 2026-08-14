@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { assertQuestionSafe, getQuestion, login, submitFeedback } from "@/lib/api";
+import { assertQuestionSafe, extractNoteText, getQuestion, login, submitFeedback } from "@/lib/api";
 
 describe("api client", () => {
   it("posts demo login as form data", async () => {
@@ -59,6 +59,25 @@ describe("api client", () => {
     expect(fetchMock.mock.calls[0][0]).toContain("/api/beta/feedback");
     expect(fetchMock.mock.calls[0][1].method).toBe("POST");
     expect(fetchMock.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer token");
+    vi.unstubAllGlobals();
+  });
+
+  it("uploads note files as form data", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ filename: "memo.txt", content_type: "text/plain", source_type: "uploaded_text", text: "透析メモの本文です。" })
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const file = new File(["透析メモの本文です。"], "memo.txt", { type: "text/plain" });
+    const response = await extractNoteText("token", file);
+
+    expect(response.source_type).toBe("uploaded_text");
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/notes/extract");
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    expect(fetchMock.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer token");
+    expect(fetchMock.mock.calls[0][1].headers.get("Content-Type")).toBeNull();
+    expect(fetchMock.mock.calls[0][1].body).toBeInstanceOf(FormData);
     vi.unstubAllGlobals();
   });
 });

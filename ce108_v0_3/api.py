@@ -1,7 +1,7 @@
 from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import Annotated
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -20,6 +20,7 @@ from ce108.services import (
     create_student_note,
     create_assignment,
     diagnostic_result,
+    extract_note_upload_text,
     generate_daily_plan,
     generate_note_questions,
     get_focus_plan,
@@ -57,7 +58,7 @@ async def lifespan(app: FastAPI):
     seed_database()
     yield
 
-app = FastAPI(title='CE108 API', version='0.4.3', lifespan=lifespan)
+app = FastAPI(title='CE108 API', version='0.4.4', lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
 oauth = OAuth2PasswordBearer(tokenUrl='/api/auth/login')
 
@@ -170,7 +171,7 @@ async def permission_error_handler(request: Request, exc: PermissionError):
 
 @app.get('/health')
 def health():
-    return {'status': 'ok', 'version': '0.4.3'}
+    return {'status': 'ok', 'version': '0.4.4'}
 
 @app.post('/api/auth/login')
 def login(form: Annotated[OAuth2PasswordRequestForm, Depends()]):
@@ -259,6 +260,11 @@ def note_create(req: NoteRequest, user=Depends(require_role('student'))):
         return {'note_id': create_student_note(user['id'], req.title, req.content, req.source_type)}
     except Exception as e:
         raise HTTPException(400, str(e))
+
+@app.post('/api/notes/extract')
+async def note_extract(file: UploadFile = File(...), user=Depends(require_role('student'))):
+    data = await file.read()
+    return extract_note_upload_text(user['id'], file.filename or 'upload', file.content_type or '', data)
 
 @app.post('/api/notes/{note_id}/generate')
 def note_generate(note_id: int, req: NoteGenerateRequest, user=Depends(require_role('student'))):

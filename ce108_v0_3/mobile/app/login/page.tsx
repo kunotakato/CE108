@@ -37,7 +37,7 @@ export default function LoginPage() {
   return (
     <AppShell title="ログイン" nav={false}>
       <section className="hero stack">
-        <p className="eyebrow">Tester Readiness v0.4.2</p>
+        <p className="eyebrow">OCR/Image AI Design v0.4.4</p>
         <h1>今日の5問を、スマホで続ける。</h1>
         <p className="lead">CE108 の学生向けモバイル学習画面です。発行された外部βアカウントで操作感を確認できます。</p>
       </section>

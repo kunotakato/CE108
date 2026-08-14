@@ -1,6 +1,6 @@
 {
   "name": "ce108-mobile-alpha",
-  "version": "0.4.2",
+  "version": "0.4.4",
   "private": true,
   "scripts": {
     "dev": "next dev",
