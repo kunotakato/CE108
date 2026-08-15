@@ -162,15 +162,23 @@ def _answer_statistics(question_id:int,db_path:Path|str=DB_PATH):
     label=f'β内正答率 {rate}%（{total}件）' if total else 'β内正答率はまだ集計中'
     return {'total_answers':total,'correct_answers':correct,'correct_rate':rate,'label':label}
 
-def _visual_aid(title:str,kind:str,steps:list[str],summary:str)->dict[str,Any]:
-    return {'title':title,'kind':kind,'steps':steps[:6],'summary':summary}
+def _visual_aid(title:str,kind:str,steps:list[str],summary:str,formula:dict[str,str]|None=None)->dict[str,Any]:
+    aid={'title':title,'kind':kind,'steps':steps[:6],'summary':summary}
+    if formula:aid['formula']=formula
+    return aid
 
 def _question_visual_aid(q:dict)->dict[str,Any]:
     text=' '.join(str(q.get(k) or '') for k in ('question_text','explanation_short','explanation_standard','topic_name','subject_name')).lower()
     if any(k in text for k in ('洞房結節','房室結節','his束','purkinje','刺激伝導')):
-        return _visual_aid('刺激伝導の流れ','flow',['洞房結節','房室結節','His束','右脚・左脚','Purkinje線維'],'心臓の興奮は上流から下流へ順に伝わります。節・束・脚・線維の位置関係を流れで覚えます。')
+        return _visual_aid('心臓の中で見る刺激伝導','anatomy',['右心房の洞房結節','房室結節で一度受ける','His束を通る','右脚・左脚に分かれる','Purkinje線維で心室へ広がる'],'洞房結節は右心房側にある最初のペースメーカーです。心臓の中の位置と伝わる順番を一緒に覚えます。')
     if any(k in text for k in ('肺胞','paco2','二酸化炭素','酸素','換気','拡散')):
         return _visual_aid('肺胞でのガス交換','exchange',['肺胞気','分圧差','肺胞膜','毛細血管','換気でCO2排出'],'肺胞と血液の間では、分圧差に沿って酸素と二酸化炭素が移動します。換気不足ではCO2が上がりやすくなります。')
+    if 'p＝f/a' in text or 'p=f/a' in text or ('圧力' in text and 'pa' in text):
+        return _visual_aid('圧力計算のイメージ','calculation',['力Fを確認','面積Aを確認','P=F/Aに代入','単位Paで答える'],'圧力は、同じ力でも面積が小さいほど大きくなります。力を面積で割る場面としてイメージします。',{'given':'F=100 N、A=0.02 m²','formula':'P = F / A','substitution':'100 / 0.02 = 5,000','result':'5,000 Pa'})
+    if 't＝1/f' in text or 't=1/f' in text or ('周期' in text and 'hz' in text):
+        return _visual_aid('周波数と周期のイメージ','calculation',['1秒間の波の数を見る','周期は1回分の時間','T=1/fに代入','秒で答える'],'Hzは1秒あたりの回数です。周期は1回にかかる時間なので、周波数の逆数になります。',{'given':'f=50 Hz','formula':'T = 1 / f','substitution':'1 / 50 = 0.02','result':'0.02 秒'})
+    if 'p＝i²r' in text or 'p=i' in text and 'r' in text:
+        return _visual_aid('電力計算のイメージ','calculation',['電流Iを確認','抵抗Rを確認','P=I²Rに代入','Wで答える'],'抵抗で消費される電力は、電流の二乗に比例します。電流を二乗してから抵抗を掛けます。',{'given':'I=0.5 A、R=10 Ω','formula':'P = I² R','substitution':'0.5² × 10 = 2.5','result':'2.5 W'})
     if any(k in text for k in ('腎小体','糸球体','原尿','濾過','腎')):
         return _visual_aid('腎小体の濾過','flow',['輸入細動脈','糸球体','濾過膜','Bowman嚢','原尿'],'血液から濾過膜を通って原尿が作られる流れを押さえると、腎機能の問題を整理しやすくなります。')
     if any(k in text for k in ('透析','限外濾過','除水','透析膜','シャント')):
@@ -466,7 +474,8 @@ def extract_note_upload_text(user_id:int,filename:str,content_type:str|None,data
         raise ValueError('ファイルが空です。ノート本文が入ったファイルを選んでください。')
     if len(data)>NOTE_OCR_MAX_BYTES:
         mb=max(1,round(NOTE_OCR_MAX_BYTES/1024/1024))
-        raise ValueError(f'ファイルサイズが大きすぎます。{mb}MB以内にしてください。')
+        current=round(len(data)/1024/1024,1)
+        raise ValueError(f'ファイルサイズが大きすぎます（約{current}MB）。{mb}MB以内の写真・PDFにしてください。写真を1枚に絞る、スクリーンショットを切り抜く、または本文をテキストで貼り付けてください。')
     is_text=mime.startswith('text/') or mime in TEXT_UPLOAD_TYPES or suffix in TEXT_UPLOAD_EXTENSIONS
     if is_text:
         try:
@@ -485,7 +494,7 @@ def extract_note_upload_text(user_id:int,filename:str,content_type:str|None,data
     is_ocr_target=mime.startswith('image/') or mime=='application/pdf' or suffix in OCR_UPLOAD_EXTENSIONS
     if is_ocr_target:
         if NOTE_OCR_PROVIDER in {'', 'disabled', 'none', 'off'}:
-            raise ValueError('写真・PDFのOCR入口は設計済みですが、この環境ではNOTE_OCR_PROVIDERがdisabledのため未有効です。.txt/.md/.csvを使うか、OCR設定後に再試行してください。')
+            raise ValueError('写真・PDFの読み取りは準備中です。今はノート本文を直接貼り付けるか、.txt/.md/.csvファイルで読み込んでください。OCRを有効化すると写真から問題作成できるようになります。')
         raise ValueError(f'NOTE_OCR_PROVIDER={NOTE_OCR_PROVIDER}はまだ接続実装前です。外部AIへ送信する前に、同意文言・保存期間・監査ログを確定してください。')
     raise ValueError('対応していないファイル形式です。.txt、.md、.csv、写真、PDFを選んでください。')
 

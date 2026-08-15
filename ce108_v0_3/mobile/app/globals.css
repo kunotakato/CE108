@@ -488,6 +488,80 @@ h3 {
   line-height: 1.55;
 }
 
+.heart-diagram {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 12px;
+  position: relative;
+}
+
+.heart-chamber {
+  border: 2px solid rgba(22, 78, 65, 0.24);
+  border-radius: 8px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 900;
+  min-height: 64px;
+  padding: 10px;
+}
+
+.heart-chamber span {
+  color: var(--danger);
+  display: inline-block;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.chamber-ra,
+.chamber-rv {
+  background: #eef7f4;
+}
+
+.chamber-la,
+.chamber-lv {
+  background: #fff6f4;
+}
+
+.conduction-line {
+  background: var(--primary);
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 5px 8px;
+  text-align: center;
+}
+
+.formula-diagram {
+  display: grid;
+  gap: 8px;
+}
+
+.formula-diagram div {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.formula-diagram span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.formula-diagram strong {
+  color: var(--primary);
+  font-size: 16px;
+}
+
 .choice-feedback-list {
   display: grid;
   gap: 8px;

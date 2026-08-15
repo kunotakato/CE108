@@ -30,6 +30,8 @@ services:
         value: /var/data/ce108.db
       - key: CE108_TOKEN_TTL_SECONDS
         value: "43200"
+      - key: NOTE_OCR_MAX_BYTES
+        value: "10485760"
       - key: CE108_CORS_ORIGINS
         sync: false
       - key: PUBLIC_BASE_URL

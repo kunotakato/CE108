@@ -11,7 +11,7 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN', '')
 LIFF_ID = os.getenv('LIFF_ID', '')
 PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL', 'http://localhost:8000')
 NOTE_OCR_PROVIDER = os.getenv('NOTE_OCR_PROVIDER', 'disabled').strip().lower()
-NOTE_OCR_MAX_BYTES = int(os.getenv('NOTE_OCR_MAX_BYTES', '5242880'))
+NOTE_OCR_MAX_BYTES = int(os.getenv('NOTE_OCR_MAX_BYTES', '10485760'))
 
 def csv_env(name: str, default: str = '') -> list[str]:
     return [item.strip() for item in os.getenv(name, default).split(',') if item.strip()]

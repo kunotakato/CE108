@@ -22,6 +22,25 @@ export function VisualAidCard({ aid }: { aid?: VisualAid | null }) {
           </div>
         ))}
       </div>
+      {aid.kind === "anatomy" ? (
+        <div className="heart-diagram" aria-hidden="true">
+          <div className="heart-chamber chamber-ra">右心房<br /><span>洞房結節</span></div>
+          <div className="heart-chamber chamber-la">左心房</div>
+          <div className="heart-chamber chamber-rv">右心室</div>
+          <div className="heart-chamber chamber-lv">左心室</div>
+          <div className="conduction-line line-av">房室結節</div>
+          <div className="conduction-line line-his">His束</div>
+          <div className="conduction-line line-purkinje">Purkinje線維</div>
+        </div>
+      ) : null}
+      {aid.kind === "calculation" && aid.formula ? (
+        <div className="formula-diagram">
+          <div><span>条件</span><strong>{aid.formula.given}</strong></div>
+          <div><span>公式</span><strong>{aid.formula.formula}</strong></div>
+          <div><span>代入</span><strong>{aid.formula.substitution}</strong></div>
+          <div><span>答え</span><strong>{aid.formula.result}</strong></div>
+        </div>
+      ) : null}
       <p className="visual-aid-summary">{aid.summary}</p>
     </section>
   );

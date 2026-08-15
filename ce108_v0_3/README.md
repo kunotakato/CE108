@@ -205,7 +205,7 @@ CE108_DB_PATH=/path/to/persistent/ce108.db
 CE108_CORS_ORIGINS=https://your-mobile-app.example.com
 PUBLIC_BASE_URL=https://your-api.example.com
 NOTE_OCR_PROVIDER=disabled
-NOTE_OCR_MAX_BYTES=5242880
+NOTE_OCR_MAX_BYTES=10485760
 ```
 
 モバイル側の主な環境変数:

@@ -9,6 +9,8 @@ import { answerNoteQuestion, createNote, extractNoteText, generateNoteQuestions 
 import { getToken } from "@/lib/auth";
 import type { NoteQuestion } from "@/lib/types";
 
+const MAX_NOTE_UPLOAD_BYTES = 10 * 1024 * 1024;
+
 export default function NotesPage() {
   const startedAt = useRef(Date.now());
   const [title, setTitle] = useState("今日の授業ノート");
@@ -38,6 +40,12 @@ export default function NotesPage() {
     setLoading(true);
     setError("");
     setNotice("");
+    if (file.size > MAX_NOTE_UPLOAD_BYTES) {
+      const sizeMb = (file.size / 1024 / 1024).toFixed(1);
+      setError(`ファイルサイズが大きすぎます（約${sizeMb}MB）。10MB以内にしてください。写真を1枚に絞る、スクリーンショットを切り抜く、または本文を貼り付けてください。`);
+      setLoading(false);
+      return;
+    }
     try {
       const extracted = await extractNoteText(token, file);
       setTitle(file.name.replace(/\.[^.]+$/, "") || "読み込みノート");
@@ -134,6 +142,7 @@ export default function NotesPage() {
             <span>ファイルから読み込む</span>
             <input accept=".txt,.md,.csv,text/plain,text/markdown,text/csv,image/*,application/pdf" type="file" onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)} />
           </label>
+          <p className="muted">アップロード上限は10MBです。写真・PDFのOCRは準備中のため、外部βでは本文貼り付けまたは.txt/.md/.csvが安定します。</p>
           {notice ? <p className="muted">{notice}</p> : null}
           <label className="field">
             <span>作成する問題数</span>

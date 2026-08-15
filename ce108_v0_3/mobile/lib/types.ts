@@ -72,9 +72,15 @@ export type AnswerPayload = {
 
 export type VisualAid = {
   title: string;
-  kind: "flow" | "exchange" | "map";
+  kind: "flow" | "exchange" | "map" | "anatomy" | "calculation";
   steps: string[];
   summary: string;
+  formula?: {
+    given: string;
+    formula: string;
+    substitution: string;
+    result: string;
+  };
 };
 
 export type AnswerResult = {

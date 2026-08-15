@@ -97,6 +97,7 @@ class TestCore(unittest.TestCase):
         self.assertIn('visual_aid', result['question'])
         self.assertEqual(result['question']['answer_statistics']['total_answers'], 1)
         self.assertGreaterEqual(len(result['question']['visual_aid']['steps']), 3)
+        self.assertIn(result['question']['visual_aid']['kind'], {'anatomy', 'flow', 'exchange', 'map', 'calculation'})
         selected_feedback = [c for c in result['question']['choice_feedback'] if c['selected']]
         self.assertTrue(selected_feedback)
         self.assertFalse(selected_feedback[0]['is_correct'])
@@ -107,6 +108,14 @@ class TestCore(unittest.TestCase):
     def test_numeric_tolerance(self):
         q = next(get_question(r['id'], self.db) for r in fetch_all("SELECT id FROM questions WHERE question_type='numeric'", (), self.db))
         self.assertTrue(check_answer(q, [], q['numeric_answer'] + (q['numeric_tolerance'] / 2)))
+
+    def test_calculation_question_returns_formula_visual_aid(self):
+        row = fetch_one("SELECT id FROM questions WHERE question_text LIKE '%圧力%' AND question_type='numeric' ORDER BY id LIMIT 1", (), self.db)
+        q = get_question(row['id'], self.db)
+        result = record_answer(self.student['id'], q['id'], [], q['numeric_answer'], 'たぶん分かる', 30, 'test', db_path=self.db)
+        self.assertEqual(result['question']['visual_aid']['kind'], 'calculation')
+        self.assertIn('formula', result['question']['visual_aid'])
+        self.assertIn('P = F / A', result['question']['visual_aid']['formula']['formula'])
 
     def test_mastery_is_updated(self):
         q = get_question(1, self.db)

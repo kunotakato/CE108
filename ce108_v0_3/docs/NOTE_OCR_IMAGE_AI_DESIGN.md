@@ -25,7 +25,7 @@
 
 ```text
 NOTE_OCR_PROVIDER=disabled
-NOTE_OCR_MAX_BYTES=5242880
+NOTE_OCR_MAX_BYTES=10485760
 ```
 
 `NOTE_OCR_PROVIDER`は既定で`disabled`にする。外部OCRを有効化する前に、入力同意、保存期間、監査ログ、削除手順、禁止データをREADMEと画面文言へ反映する。
