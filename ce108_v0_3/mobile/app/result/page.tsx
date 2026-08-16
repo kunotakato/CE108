@@ -13,7 +13,7 @@ export default function ResultPage() {
   useEffect(() => {
     const session = getSession();
     setAnswers(session.answers);
-    setMinutes(Math.max(1, Math.round((Date.now() - session.startedAt) / 60000)));
+    setMinutes(Math.max(1, Math.min(180, Math.round((Date.now() - session.startedAt) / 60000))));
   }, []);
 
   const correct = answers.filter((answer) => answer.isCorrect).length;

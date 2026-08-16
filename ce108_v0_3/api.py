@@ -201,16 +201,16 @@ def answer(qid: int, req: AnswerRequest, user=Depends(require_role('student'))):
     return record_answer(user['id'], qid, req.selected_codes, req.numeric_answer, req.confidence, req.response_time_seconds, req.answer_mode)
 
 @app.get('/api/study/today')
-def today(user=Depends(require_role('student'))):
-    return generate_daily_plan(user['id'])
+def today(count: int = 5, user=Depends(require_role('student'))):
+    return generate_daily_plan(user['id'], count=max(1, min(count, 20)))
 
 @app.get('/api/study/focus')
 def study_focus(mode: str = 'balanced', count: int = 5, user=Depends(require_role('student'))):
     return get_focus_plan(user['id'], mode=mode, count=count)
 
 @app.get('/api/study/daily-status')
-def daily_status(user=Depends(require_role('student'))):
-    return get_daily_status(user['id'])
+def daily_status(count: int = 5, user=Depends(require_role('student'))):
+    return get_daily_status(user['id'], count=max(1, min(count, 20)))
 
 @app.get('/api/study/reviews')
 def review_queue(limit: int = 20, user=Depends(require_role('student'))):

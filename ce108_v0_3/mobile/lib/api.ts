@@ -72,16 +72,16 @@ export async function login(username: string, password: string) {
   return apiFetch<LoginResponse>("/api/auth/login", { method: "POST", form });
 }
 
-export async function getToday(token: string) {
-  return apiFetch<DailyPlan>("/api/study/today", { token });
+export async function getToday(token: string, count = 5) {
+  return apiFetch<DailyPlan>(`/api/study/today?count=${count}`, { token });
 }
 
 export async function getFocusPlan(token: string, mode: StudyMode, count = 5) {
   return apiFetch<DailyPlan>(`/api/study/focus?mode=${mode}&count=${count}`, { token });
 }
 
-export async function getDailyStatus(token: string) {
-  return apiFetch<DailyStatus>("/api/study/daily-status", { token });
+export async function getDailyStatus(token: string, count = 5) {
+  return apiFetch<DailyStatus>(`/api/study/daily-status?count=${count}`, { token });
 }
 
 export async function getReviewQueue(token: string, limit = 20) {

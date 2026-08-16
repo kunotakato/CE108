@@ -229,10 +229,20 @@ def record_answer(user_id:int,question_id:int,selected_codes:list[str]|None,nume
 
 def _count(minutes:int)->int:return max(3,min(20,round(minutes/3)))
 
+def _limit_plan_items(plan:dict|None,count:int|None):
+    if not plan or count is None:
+        return plan
+    limit=max(1,min(20,int(count)))
+    d=dict(plan)
+    d['items']=list(d.get('items',[]))[:limit]
+    d['recommended_count']=len(d['items'])
+    d['estimated_minutes']=max(5,round(len(d['items'])*2.5)) if d['items'] else 0
+    return d
+
 def generate_daily_plan(user_id:int,count:int|None=None,plan_date:str|None=None,db_path:Path|str=DB_PATH):
     plan_date=plan_date or _today().isoformat();user=get_user(user_id,db_path);count=count or _count(int(user['daily_study_minutes'] or 15))
     old=fetch_one('SELECT id FROM daily_study_plans WHERE user_id=? AND plan_date=?',(user_id,plan_date),db_path)
-    if old:return get_daily_plan(user_id,plan_date,db_path)
+    if old:return _limit_plan_items(get_daily_plan(user_id,plan_date,db_path),count)
     due=[dict(r) for r in fetch_all('''SELECT r.question_id,q.importance FROM review_schedules r JOIN questions q ON q.id=r.question_id WHERE r.user_id=? AND r.status='pending' AND r.scheduled_date<=? AND q.status='published' ORDER BY r.priority DESC,r.scheduled_date LIMIT ?''',(user_id,plan_date,count),db_path)]
     selected=[];ids=set()
     for r in due[:max(1,round(count*.4))]:selected.append((r['question_id'],'復習','復習期限が到来しています'));ids.add(r['question_id'])
@@ -246,7 +256,7 @@ def generate_daily_plan(user_id:int,count:int|None=None,plan_date:str|None=None,
         if cur.rowcount:
             pid=int(cur.lastrowid)
             conn.executemany('INSERT INTO daily_study_plan_items(plan_id,question_id,item_type,display_order,reason) VALUES(?,?,?,?,?)',[(pid,q,t,i+1,r) for i,(q,t,r) in enumerate(selected)])
-    return get_daily_plan(user_id,plan_date,db_path)
+    return _limit_plan_items(get_daily_plan(user_id,plan_date,db_path),count)
 
 def get_daily_plan(user_id:int,plan_date:str|None=None,db_path:Path|str=DB_PATH):
     plan_date=plan_date or _today().isoformat();p=fetch_one('SELECT * FROM daily_study_plans WHERE user_id=? AND plan_date=?',(user_id,plan_date),db_path)
@@ -347,8 +357,8 @@ def _streak(dates:list[date],today:date)->int:
         count+=1;cur-=timedelta(days=1)
     return count
 
-def get_daily_status(user_id:int,db_path:Path|str=DB_PATH):
-    today=_today();plan=generate_daily_plan(user_id,db_path=db_path);items=plan.get('items',[]) if plan else []
+def get_daily_status(user_id:int,db_path:Path|str=DB_PATH,count:int|None=None):
+    today=_today();plan=generate_daily_plan(user_id,count=count,db_path=db_path);items=plan.get('items',[]) if plan else []
     completed=sum(1 for i in items if i.get('completed'));total=len(items);dates=_answer_dates(user_id,db_path)
     week_start=today-timedelta(days=6);week=[{'date':(week_start+timedelta(days=i)).isoformat(),'completed':(week_start+timedelta(days=i)) in set(dates)} for i in range(7)]
     due=fetch_one("SELECT COUNT(*) due FROM review_schedules WHERE user_id=? AND status='pending' AND scheduled_date<=?",(user_id,today.isoformat()),db_path)

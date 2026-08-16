@@ -12,8 +12,12 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/StateViews";
 import { VisualAidCard } from "@/components/VisualAid";
 import { getFocusPlan, getQuestion, getToday, submitAnswer } from "@/lib/api";
 import { getToken } from "@/lib/auth";
-import { addSessionAnswer, getSession, resetSession } from "@/lib/studySession";
+import { addSessionAnswer, ensureSession, getSession } from "@/lib/studySession";
 import type { AnswerResult, DailyPlan, DailyPlanItem, Question, StudyMode } from "@/lib/types";
+
+function buildSessionKey(plan: DailyPlan, mode: StudyMode | "daily") {
+  return `${mode}:${plan.plan_date}:${plan.id}:${plan.items.slice(0, 5).map((item) => item.question_id).join("-")}`;
+}
 
 function StudyPageContent() {
   const router = useRouter();
@@ -32,8 +36,11 @@ function StudyPageContent() {
   const [error, setError] = useState("");
 
   const items = useMemo(() => plan?.items.slice(0, 5) ?? [], [plan]);
+  const sessionKey = useMemo(() => (plan ? buildSessionKey(plan, mode) : "unloaded"), [mode, plan]);
+  const answeredIds = new Set((sessionKey === "unloaded" ? [] : getSession(sessionKey).answers).map((answer) => answer.questionId));
   const item: DailyPlanItem | undefined = items[currentIndex];
   const currentQuestionId = item?.question_id;
+  const allCompleted = items.length > 0 && items.every((planItem) => planItem.completed || answeredIds.has(planItem.question_id));
 
   const loadPlan = useCallback(async function loadPlan() {
     const token = getToken();
@@ -46,8 +53,13 @@ function StudyPageContent() {
     setError("");
     try {
       const today = mode === "daily" ? await getToday(token) : await getFocusPlan(token, mode, 5);
+      const nextItems = today.items.slice(0, 5);
+      const nextIndex = nextItems.findIndex((planItem) => !planItem.completed);
+      ensureSession(buildSessionKey(today, mode));
       setPlan(today);
-      if (getSession().answers.length === 0) resetSession();
+      setCurrentIndex(nextIndex >= 0 ? nextIndex : nextItems.length);
+      setQuestion(null);
+      setResult(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "今日の問題を読み込めませんでした。");
     } finally {
@@ -79,7 +91,11 @@ function StudyPageContent() {
   }, [loadPlan]);
 
   useEffect(() => {
-    if (currentQuestionId) void loadQuestion(currentQuestionId);
+    if (currentQuestionId) {
+      void loadQuestion(currentQuestionId);
+    } else {
+      setQuestion(null);
+    }
   }, [currentQuestionId]);
 
   function toggleChoice(code: string) {
@@ -112,7 +128,7 @@ function StudyPageContent() {
         answer_mode: "daily"
       });
       setResult(answer);
-      addSessionAnswer({
+      addSessionAnswer(sessionKey, {
         questionId: question.id,
         subjectName: question.subject_name,
         topicName: question.topic_name,
@@ -120,6 +136,10 @@ function StudyPageContent() {
         reviewDate: answer.review_date,
         seconds
       });
+      setPlan((current) => current ? {
+        ...current,
+        items: current.items.map((planItem) => planItem.question_id === question.id ? { ...planItem, completed: 1 } : planItem)
+      } : current);
     } catch (err) {
       setError(err instanceof Error ? err.message : "回答を保存できませんでした。");
     } finally {
@@ -128,11 +148,18 @@ function StudyPageContent() {
   }
 
   function next() {
-    if (currentIndex + 1 >= items.length || getSession().answers.length >= 5) {
-      router.push("/result");
+    const latestAnsweredIds = new Set(getSession(sessionKey).answers.map((answer) => answer.questionId));
+    const nextIndex = items.findIndex((planItem, index) => index > currentIndex && !planItem.completed && !latestAnsweredIds.has(planItem.question_id));
+    if (nextIndex >= 0) {
+      setCurrentIndex(nextIndex);
       return;
     }
-    setCurrentIndex((current) => current + 1);
+    const remainingIndex = items.findIndex((planItem) => !planItem.completed && !latestAnsweredIds.has(planItem.question_id));
+    if (remainingIndex >= 0) {
+      setCurrentIndex(remainingIndex);
+      return;
+    }
+    router.push("/result");
   }
 
   const numericValue = Number(numeric);
@@ -151,6 +178,15 @@ function StudyPageContent() {
       <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false} bottomAction>
         <ErrorState message={error} onRetry={item ? () => loadQuestion(item.question_id) : loadPlan} />
         <Link className="link-button" href="/home">ホームへ戻る</Link>
+      </AppShell>
+    );
+  }
+
+  if (allCompleted && !result) {
+    return (
+      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false} bottomAction>
+        <EmptyState message="今日の5問は完了しています。" />
+        <BottomAction onClick={() => router.push("/result")}>結果を見る</BottomAction>
       </AppShell>
     );
   }
@@ -242,8 +278,11 @@ function StudyPageContent() {
                     key={related.id}
                     type="button"
                     onClick={() => {
-                      setCurrentIndex(items.findIndex((planItem) => planItem.question_id === related.id));
-                      void loadQuestion(related.id);
+                      const relatedIndex = items.findIndex((planItem) => planItem.question_id === related.id);
+                      if (relatedIndex >= 0) {
+                        setCurrentIndex(relatedIndex);
+                        void loadQuestion(related.id);
+                      }
                     }}
                     disabled={items.every((planItem) => planItem.question_id !== related.id)}
                   >

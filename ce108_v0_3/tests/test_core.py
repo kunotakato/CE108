@@ -133,6 +133,19 @@ class TestCore(unittest.TestCase):
         plan = generate_daily_plan(self.student['id'], count=5, db_path=self.db)
         self.assertEqual(len(plan['items']), 5)
 
+    def test_mobile_daily_plan_limits_existing_plan_to_five(self):
+        plan = generate_daily_plan(self.student['id'], count=7, db_path=self.db)
+        self.assertEqual(len(plan['items']), 7)
+        limited = generate_daily_plan(self.student['id'], count=5, db_path=self.db)
+        self.assertEqual(len(limited['items']), 5)
+        for item in limited['items']:
+            q = get_question(item['question_id'], self.db)
+            record_answer(self.student['id'], q['id'], q['correct_codes'], q.get('numeric_answer'), 'たぶん分かる', 20, 'daily', db_path=self.db)
+        status = get_daily_status(self.student['id'], count=5, db_path=self.db)
+        self.assertEqual(status['completed_count'], 5)
+        self.assertEqual(status['total_count'], 5)
+        self.assertEqual(status['status'], 'completed')
+
     def test_seed_contains_expanded_original_questions_with_choice_explanations(self):
         total = fetch_one('SELECT COUNT(*) total FROM questions', (), self.db)['total']
         empty = fetch_one("SELECT COUNT(*) total FROM question_choices WHERE TRIM(COALESCE(explanation,''))=''", (), self.db)['total']
