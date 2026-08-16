@@ -5,11 +5,12 @@ type Props = {
   title?: string;
   children: ReactNode;
   nav?: boolean;
+  bottomAction?: boolean;
 };
 
-export function AppShell({ title = "CE108", children, nav = true }: Props) {
+export function AppShell({ title = "CE108", children, nav = true, bottomAction = false }: Props) {
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${bottomAction ? "has-bottom-action" : ""}`}>
       <header className="top-bar">
         <Link className="brand" href="/home" aria-label="CE108 home">
           CE108

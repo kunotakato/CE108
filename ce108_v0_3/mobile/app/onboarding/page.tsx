@@ -23,7 +23,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <AppShell title="初期設定" nav={false}>
+    <AppShell title="初期設定" nav={false} bottomAction>
       <section className="hero stack">
         <p className="eyebrow">はじめに</p>
         <h1>毎日続ける量を決めましょう。</h1>

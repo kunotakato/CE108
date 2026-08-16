@@ -42,7 +42,7 @@ export default function NotesPage() {
     setNotice("");
     if (file.size > MAX_NOTE_UPLOAD_BYTES) {
       const sizeMb = (file.size / 1024 / 1024).toFixed(1);
-      setError(`ファイルサイズが大きすぎます（約${sizeMb}MB）。10MB以内にしてください。写真を1枚に絞る、スクリーンショットを切り抜く、または本文を貼り付けてください。`);
+      setError(`約${sizeMb}MBです。10MB以内にしてください。写真を1枚にするか、本文を貼り付けてください。`);
       setLoading(false);
       return;
     }
@@ -142,7 +142,7 @@ export default function NotesPage() {
             <span>ファイルから読み込む</span>
             <input accept=".txt,.md,.csv,text/plain,text/markdown,text/csv,image/*,application/pdf" type="file" onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)} />
           </label>
-          <p className="muted">アップロード上限は10MBです。写真・PDFのOCRは準備中のため、外部βでは本文貼り付けまたは.txt/.md/.csvが安定します。</p>
+          <p className="muted">上限10MB。写真・PDF読み取りは準備中です。外部βでは本文貼り付け、.txt、.md、.csvが安定します。</p>
           {notice ? <p className="muted">{notice}</p> : null}
           <label className="field">
             <span>作成する問題数</span>
@@ -158,7 +158,7 @@ export default function NotesPage() {
           <button className="primary-button" disabled={!canGenerate} type="button" onClick={handleGenerate}>
             {loading ? "作成中" : "ノートから問題を作る"}
           </button>
-          <p className="muted">v0.4.4では外部AI APIを使わず、CE108内の重要文抽出で生成します。公式過去問ではなく復習用オリジナル問題です。生成内容は誤る可能性があるため、解説とノートを照合してください。写真・PDFのOCRは設計済みですが、本番OCR接続は未有効です。</p>
+          <p className="muted">外部AI APIは使いません。CE108内の重要文から復習用オリジナル問題を作ります。生成内容はノートと照合してください。</p>
         </section>
         {error ? <ErrorState message={error} /> : null}
         {questions.length ? (

@@ -6,6 +6,8 @@ v0.4.3の目的は、最初の外部テスター1人がスマートフォンでC
 
 最初の1人へ何をどう渡すかの設計は、`docs/FIRST_TESTER_DELIVERY_DESIGN.md`を参照してください。
 
+実際の検収記録は、`docs/FIRST_TESTER_ACCEPTANCE_CHECKLIST.md`を複製せず、そのままチェックして残します。
+
 ## Before Inviting
 
 - FastAPIとmobileの公開URLがHTTPSで開ける。

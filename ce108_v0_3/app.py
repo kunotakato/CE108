@@ -140,6 +140,28 @@ def admin_feedback(u):
         st.subheader('対応優先度')
         st.bar_chart(pd.Series(summary['priority_counts']).reindex(['高','中','低']).fillna(0))
     df=pd.DataFrame(items)
+    st.subheader('集中している論点')
+    issue_keywords={
+        'ログイン': ['ログイン','password','パスワード','認証'],
+        '通信・API': ['failed','fetch','not found','502','api','通信','読み込'],
+        '問題・解説': ['解説','誤答','正答','図解','問題','選択肢'],
+        'ノートAI': ['ノート','ocr','写真','pdf','ファイル','アップロード'],
+        '画面操作': ['ボタン','下部','被り','見づら','スマホ','表示'],
+    }
+    issue_rows=[]
+    for label,words in issue_keywords.items():
+        mask=df['message'].fillna('').str.lower().apply(lambda text:any(word.lower() in text for word in words))
+        issue_rows.append({'論点':label,'件数':int(mask.sum()),'高優先度':int(((df['priority']=='高') & mask).sum())})
+    issue_df=pd.DataFrame(issue_rows).sort_values(['高優先度','件数'],ascending=False)
+    top_cols=st.columns([1,1])
+    with top_cols[0]:
+        st.dataframe(issue_df,width='stretch',hide_index=True)
+    with top_cols[1]:
+        st.bar_chart(issue_df.set_index('論点')['件数'])
+    if summary.get('page_counts'):
+        page_df=pd.DataFrame([{'画面':k,'件数':v} for k,v in summary['page_counts'].items()]).sort_values('件数',ascending=False)
+        with st.expander('画面別の集中箇所',expanded=False):
+            st.dataframe(page_df,width='stretch',hide_index=True)
     st.subheader('フィードバック一覧')
     f1,f2,f3=st.columns([1,1,2])
     cat=f1.selectbox('カテゴリ',['すべて']+sorted(df['category'].dropna().unique().tolist()))
@@ -156,6 +178,13 @@ def admin_feedback(u):
     if not urgent.empty:
         with st.expander('早急対応が必要な意見',expanded=True):
             for _,r in urgent.head(10).iterrows():st.warning(f"{r['created_at']}｜{r['category']}｜評価{r['rating']}｜{r['display_name']}：{r['message']}")
+    with st.expander('次の修正判断',expanded=True):
+        st.markdown('''
+- `高優先度`が1件以上ある論点を先に修正する。
+- 同じ論点が2件以上出たら、個別要望ではなくUI/仕様の問題として扱う。
+- `通信・API`、`ログイン`、`回答保存`は学習継続を止めるため最優先にする。
+- `問題・解説`、`図解`は継続率に直結するため、次の小修正単位で改善する。
+''')
 def admin_add(u):
     hero('問題登録','オリジナル問題または権利確認済み問題を登録します。');topics=list_topics();to={f"{x['code']}｜{x['name']}":x['code'] for x in topics}
     with st.form('addq2'):

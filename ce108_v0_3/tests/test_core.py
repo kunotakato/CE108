@@ -174,7 +174,7 @@ class TestCore(unittest.TestCase):
     def test_note_upload_image_requires_ocr_provider(self):
         with self.assertRaises(ValueError) as ctx:
             extract_note_upload_text(self.student['id'], 'note.png', 'image/png', b'\x89PNG\r\n', self.db)
-        self.assertIn('OCR', str(ctx.exception))
+        self.assertIn('写真・PDF読み取り', str(ctx.exception))
 
     def test_focus_plan_modes(self):
         medical = get_focus_plan(self.student['id'], 'medical', 5, self.db)
@@ -430,7 +430,7 @@ class TestApi(unittest.TestCase):
         token = self._token()
         res = self.client.post('/api/notes/extract', headers={'Authorization': f'Bearer {token}'}, files={'file': ('memo.png', b'\x89PNG\r\n', 'image/png')})
         self.assertEqual(res.status_code, 400)
-        self.assertIn('OCR', res.text)
+        self.assertIn('写真・PDF読み取り', res.text)
 
     def test_teacher_support_api(self):
         token = self._token('teacher@ce108.local')

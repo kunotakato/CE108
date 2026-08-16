@@ -140,7 +140,7 @@ function StudyPageContent() {
 
   if (loading && !question) {
     return (
-      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false}>
+      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false} bottomAction>
         <LoadingState />
       </AppShell>
     );
@@ -148,7 +148,7 @@ function StudyPageContent() {
 
   if (error && !question) {
     return (
-      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false}>
+      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false} bottomAction>
         <ErrorState message={error} onRetry={item ? () => loadQuestion(item.question_id) : loadPlan} />
         <Link className="link-button" href="/home">ホームへ戻る</Link>
       </AppShell>
@@ -157,7 +157,7 @@ function StudyPageContent() {
 
   if (!item || !question) {
     return (
-      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false}>
+      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false} bottomAction>
         <EmptyState message="今日の問題がありません。" />
         <BottomAction onClick={() => router.push("/home")}>ホームへ戻る</BottomAction>
       </AppShell>
@@ -165,7 +165,7 @@ function StudyPageContent() {
   }
 
   return (
-    <AppShell title={plan?.mode_label || "今日の5問"} nav={false}>
+    <AppShell title={plan?.mode_label || "今日の5問"} nav={false} bottomAction>
       <div className="stack">
         <ProgressHeader current={currentIndex + 1} total={items.length} />
         <section className="question-card stack">
@@ -275,7 +275,7 @@ function StudyPageContent() {
 
 export default function StudyPage() {
   return (
-    <Suspense fallback={<AppShell title="今日の5問" nav={false}><LoadingState /></AppShell>}>
+    <Suspense fallback={<AppShell title="今日の5問" nav={false} bottomAction><LoadingState /></AppShell>}>
       <StudyPageContent />
     </Suspense>
   );

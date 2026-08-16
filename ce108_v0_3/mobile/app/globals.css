@@ -45,6 +45,10 @@ a {
   padding: env(safe-area-inset-top) 0 calc(72px + env(safe-area-inset-bottom));
 }
 
+.app-shell.has-bottom-action {
+  padding-bottom: calc(156px + env(safe-area-inset-bottom));
+}
+
 .top-bar {
   align-items: center;
   background: rgba(246, 247, 242, 0.92);
@@ -345,16 +349,22 @@ h3 {
 }
 
 .bottom-action {
-  background: rgba(246, 247, 242, 0.96);
+  background: linear-gradient(180deg, rgba(246, 247, 242, 0.62), rgba(246, 247, 242, 0.98) 28%);
   border-top: 1px solid var(--line);
   bottom: 0;
   display: grid;
   gap: 8px;
   left: 0;
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  padding: 14px 16px calc(12px + env(safe-area-inset-bottom));
   position: fixed;
   right: 0;
   z-index: 20;
+}
+
+.bottom-action > button,
+.bottom-action > .secondary-button {
+  margin: 0 auto;
+  max-width: 520px;
 }
 
 .progress-panel {
@@ -415,12 +425,12 @@ h3 {
 }
 
 .visual-aid {
-  background: #fbfdfb;
-  border: 1px solid rgba(22, 78, 65, 0.18);
+  background: #f8fbfa;
+  border: 1px solid rgba(22, 78, 65, 0.24);
   border-radius: 8px;
   display: grid;
-  gap: 12px;
-  padding: 12px;
+  gap: 14px;
+  padding: 14px;
 }
 
 .visual-aid-header {
@@ -432,19 +442,17 @@ h3 {
 
 .visual-aid-header h3 {
   color: var(--primary);
+  font-size: 17px;
 }
 
 .visual-aid-track {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
 }
 
 .visual-aid-step-wrap {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-  max-width: 100%;
+  display: contents;
 }
 
 .visual-aid-step {
@@ -456,6 +464,7 @@ h3 {
   gap: 8px;
   min-height: 42px;
   padding: 8px 10px;
+  width: 100%;
 }
 
 .visual-aid-step span {
@@ -479,6 +488,7 @@ h3 {
 
 .visual-aid-arrow {
   color: var(--primary);
+  display: none;
   font-weight: 900;
 }
 
@@ -499,6 +509,17 @@ h3 {
   position: relative;
 }
 
+.heart-diagram::before {
+  background: linear-gradient(180deg, var(--danger), var(--primary));
+  border-radius: 999px;
+  bottom: 34px;
+  content: "";
+  left: calc(50% - 3px);
+  position: absolute;
+  top: 34px;
+  width: 6px;
+}
+
 .heart-chamber {
   border: 2px solid rgba(22, 78, 65, 0.24);
   border-radius: 8px;
@@ -507,6 +528,8 @@ h3 {
   font-weight: 900;
   min-height: 64px;
   padding: 10px;
+  position: relative;
+  z-index: 1;
 }
 
 .heart-chamber span {
@@ -534,11 +557,13 @@ h3 {
   font-weight: 900;
   padding: 5px 8px;
   text-align: center;
+  z-index: 1;
 }
 
 .formula-diagram {
   display: grid;
   gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .formula-diagram div {
@@ -560,6 +585,13 @@ h3 {
 .formula-diagram strong {
   color: var(--primary);
   font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 380px) {
+  .formula-diagram {
+    grid-template-columns: 1fr;
+  }
 }
 
 .choice-feedback-list {

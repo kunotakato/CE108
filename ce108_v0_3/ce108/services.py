@@ -475,7 +475,7 @@ def extract_note_upload_text(user_id:int,filename:str,content_type:str|None,data
     if len(data)>NOTE_OCR_MAX_BYTES:
         mb=max(1,round(NOTE_OCR_MAX_BYTES/1024/1024))
         current=round(len(data)/1024/1024,1)
-        raise ValueError(f'ファイルサイズが大きすぎます（約{current}MB）。{mb}MB以内の写真・PDFにしてください。写真を1枚に絞る、スクリーンショットを切り抜く、または本文をテキストで貼り付けてください。')
+        raise ValueError(f'約{current}MBです。{mb}MB以内にしてください。写真を1枚にするか、本文を貼り付けてください。')
     is_text=mime.startswith('text/') or mime in TEXT_UPLOAD_TYPES or suffix in TEXT_UPLOAD_EXTENSIONS
     if is_text:
         try:
@@ -494,7 +494,7 @@ def extract_note_upload_text(user_id:int,filename:str,content_type:str|None,data
     is_ocr_target=mime.startswith('image/') or mime=='application/pdf' or suffix in OCR_UPLOAD_EXTENSIONS
     if is_ocr_target:
         if NOTE_OCR_PROVIDER in {'', 'disabled', 'none', 'off'}:
-            raise ValueError('写真・PDFの読み取りは準備中です。今はノート本文を直接貼り付けるか、.txt/.md/.csvファイルで読み込んでください。OCRを有効化すると写真から問題作成できるようになります。')
+            raise ValueError('写真・PDF読み取りは準備中です。今は本文貼り付け、.txt、.md、.csvを使ってください。')
         raise ValueError(f'NOTE_OCR_PROVIDER={NOTE_OCR_PROVIDER}はまだ接続実装前です。外部AIへ送信する前に、同意文言・保存期間・監査ログを確定してください。')
     raise ValueError('対応していないファイル形式です。.txt、.md、.csv、写真、PDFを選んでください。')
 

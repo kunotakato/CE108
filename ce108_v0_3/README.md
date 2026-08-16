@@ -232,6 +232,7 @@ python scripts/create_tester_account.py \
 docs/DEPLOYMENT_PLAN.md
 docs/RENDER_DEPLOYMENT.md
 docs/EXTERNAL_BETA_GUIDE.md
+docs/FIRST_TESTER_ACCEPTANCE_CHECKLIST.md
 docs/NOTE_OCR_IMAGE_AI_DESIGN.md
 ```
 
