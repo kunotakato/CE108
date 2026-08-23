@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ConfidenceSelector } from "@/components/ConfidenceSelector";
 import { EmptyState, ErrorState } from "@/components/StateViews";
@@ -13,6 +13,7 @@ const MAX_NOTE_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 export default function NotesPage() {
   const startedAt = useRef(Date.now());
+  const answerResultRef = useRef<HTMLDivElement | null>(null);
   const [title, setTitle] = useState("今日の授業ノート");
   const [content, setContent] = useState("");
   const [sourceType, setSourceType] = useState("manual_note");
@@ -29,6 +30,12 @@ export default function NotesPage() {
   const current = questions[currentIndex];
   const canGenerate = content.trim().length >= 20 && !loading;
   const answeredCount = useMemo(() => questions.filter((question) => question.answered).length, [questions]);
+
+  useEffect(() => {
+    if (answered && answerResultRef.current) {
+      answerResultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [answered]);
 
   async function handleFileChange(file: File | null) {
     if (!file) return;
@@ -185,14 +192,19 @@ export default function NotesPage() {
             </div>
             <ConfidenceSelector value={confidence} onChange={setConfidence} />
             {answered ? (
-              <div className="stack">
+              <div className="stack answer-result" ref={answerResultRef}>
+                <div className="result-heading">
+                  <span className="pill">解説と図解</span>
+                  <span className="pill">{answered.answer_statistics?.label || "回答を保存しました"}</span>
+                </div>
                 <h3 className={answered.choice_feedback?.some((choice) => choice.selected && choice.is_correct) ? "correct" : "incorrect"}>
                   {answered.choice_feedback?.some((choice) => choice.selected && choice.is_correct) ? "正解です" : "復習しましょう"}
                 </h3>
-                {answered.answer_statistics ? <span className="pill">{answered.answer_statistics.label}</span> : null}
                 {answered.learning_point ? <p className="lead-small">{answered.learning_point}</p> : null}
                 <VisualAidCard aid={answered.visual_aid} />
-                <p className="explanation">{answered.explanation}</p>
+                <div className="explanation">
+                  <p>{answered.explanation || "解説は生成されませんでした。ノート本文を確認してください。"}</p>
+                </div>
                 <div className="choice-feedback-list">
                   {answered.choice_feedback?.map((choice) => (
                     <article className={`choice-feedback ${choice.is_correct ? "correct-choice" : choice.selected ? "selected-wrong-choice" : ""}`} key={choice.choice_code}>

@@ -472,8 +472,8 @@ def create_student_note(user_id:int,title:str,content:str,source_type:str='manua
 def list_student_notes(user_id:int,db_path:Path|str=DB_PATH):
     return [dict(r) for r in fetch_all('''SELECT n.*,COUNT(q.id) generated_question_count FROM student_notes n LEFT JOIN note_generated_questions q ON q.note_id=n.id WHERE n.user_id=? GROUP BY n.id ORDER BY n.created_at DESC''',(user_id,),db_path)]
 
-TEXT_UPLOAD_EXTENSIONS={'.txt','.md','.markdown','.csv'}
-TEXT_UPLOAD_TYPES={'text/plain','text/markdown','text/csv','application/csv','application/vnd.ms-excel'}
+TEXT_UPLOAD_EXTENSIONS={'.txt','.text','.md','.markdown','.csv','.tsv'}
+TEXT_UPLOAD_TYPES={'text/plain','text/markdown','text/csv','text/tab-separated-values','application/csv','application/vnd.ms-excel','application/octet-stream'}
 OCR_UPLOAD_EXTENSIONS={'.png','.jpg','.jpeg','.webp','.heic','.pdf'}
 
 def extract_note_upload_text(user_id:int,filename:str,content_type:str|None,data:bytes,db_path:Path|str=DB_PATH):
@@ -493,11 +493,11 @@ def extract_note_upload_text(user_id:int,filename:str,content_type:str|None,data
         except UnicodeDecodeError:
             text=data.decode('utf-8',errors='replace')
         text=text.replace('\x00','').strip()
-        if len(text)<20:
-            raise ValueError('抽出した本文が短すぎます。20文字以上の学習メモを読み込んでください。')
         if len(text)>20000:
             text=text[:20000]
             warning='20,000文字を超えたため、先頭20,000文字だけを読み込みました。'
+        elif len(text)<20:
+            warning='ファイルは読み込めました。問題作成には20文字以上になるよう本文を追記してください。'
         else:
             warning=''
         return {'filename':name,'content_type':mime or 'text/plain','source_type':'uploaded_text','text':text,'warning':warning}

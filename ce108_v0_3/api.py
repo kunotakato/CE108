@@ -263,8 +263,11 @@ def note_create(req: NoteRequest, user=Depends(require_role('student'))):
 
 @app.post('/api/notes/extract')
 async def note_extract(file: UploadFile = File(...), user=Depends(require_role('student'))):
-    data = await file.read()
-    return extract_note_upload_text(user['id'], file.filename or 'upload', file.content_type or '', data)
+    try:
+        data = await file.read()
+        return extract_note_upload_text(user['id'], file.filename or 'upload', file.content_type or '', data)
+    except Exception as e:
+        raise HTTPException(400, str(e))
 
 @app.post('/api/notes/{note_id}/generate')
 def note_generate(note_id: int, req: NoteGenerateRequest, user=Depends(require_role('student'))):

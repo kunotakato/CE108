@@ -184,6 +184,12 @@ class TestCore(unittest.TestCase):
         self.assertEqual(result['source_type'], 'uploaded_text')
         self.assertIn('人工呼吸管理', result['text'])
 
+    def test_note_upload_short_text_extracts_with_warning(self):
+        result = extract_note_upload_text(self.student['id'], 'memo.txt', 'application/octet-stream', '短いメモ'.encode('utf-8'), self.db)
+        self.assertEqual(result['source_type'], 'uploaded_text')
+        self.assertEqual(result['text'], '短いメモ')
+        self.assertIn('20文字以上', result['warning'])
+
     def test_note_upload_image_requires_ocr_provider(self):
         with self.assertRaises(ValueError) as ctx:
             extract_note_upload_text(self.student['id'], 'note.png', 'image/png', b'\x89PNG\r\n', self.db)
@@ -430,6 +436,11 @@ class TestApi(unittest.TestCase):
         res = self.client.post(f"/api/note-questions/{q['id']}/answer", headers={'Authorization': f'Bearer {token}'}, json={'selected_code': '1', 'confidence': 'たぶん分かる', 'response_time_seconds': 10})
         self.assertEqual(res.status_code, 200, res.text)
         self.assertTrue(res.json()['is_correct'])
+        body = res.json()['question']
+        self.assertIn('explanation', body)
+        self.assertIn('choice_feedback', body)
+        self.assertIn('visual_aid', body)
+        self.assertGreaterEqual(len(body['visual_aid']['steps']), 3)
 
     def test_note_extract_api_reads_text_file(self):
         token = self._token()
@@ -438,6 +449,14 @@ class TestApi(unittest.TestCase):
         body = res.json()
         self.assertEqual(body['source_type'], 'uploaded_text')
         self.assertIn('血液透析', body['text'])
+
+    def test_note_extract_api_reads_octet_stream_text_file(self):
+        token = self._token()
+        res = self.client.post('/api/notes/extract', headers={'Authorization': f'Bearer {token}'}, files={'file': ('memo.txt', '短いメモ'.encode('utf-8'), 'application/octet-stream')})
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertEqual(body['source_type'], 'uploaded_text')
+        self.assertIn('20文字以上', body['warning'])
 
     def test_note_extract_api_rejects_image_without_ocr_provider(self):
         token = self._token()

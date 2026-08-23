@@ -424,6 +424,20 @@ h3 {
   padding-left: 12px;
 }
 
+.answer-result {
+  background: #f8fbfa;
+  border: 1px solid rgba(22, 78, 65, 0.24);
+  border-radius: 8px;
+  padding: 14px;
+  scroll-margin-top: 72px;
+}
+
+.result-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .visual-aid {
   background: #f8fbfa;
   border: 1px solid rgba(22, 78, 65, 0.24);
