@@ -602,8 +602,146 @@ h3 {
   overflow-wrap: anywhere;
 }
 
+.balance-diagram,
+.lung-diagram {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.balance-diagram div,
+.lung-diagram div {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--primary);
+  display: grid;
+  font-size: 12px;
+  font-weight: 900;
+  min-height: 54px;
+  place-items: center;
+  text-align: center;
+}
+
+.balance-diagram span {
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.balance-diagram strong {
+  font-size: 11px;
+}
+
+.circulation-diagram,
+.membrane-diagram,
+.circuit-diagram,
+.wave-diagram {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.circulation-diagram {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.circulation-diagram div,
+.membrane-diagram div {
+  background: #eef7f4;
+  border: 1px solid rgba(22, 78, 65, 0.24);
+  border-radius: 8px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 900;
+  min-height: 48px;
+  padding: 10px;
+  text-align: center;
+}
+
+.circulation-diagram strong,
+.membrane-diagram strong {
+  border-left: 4px solid var(--primary);
+  color: var(--primary);
+  font-size: 13px;
+  grid-column: 1 / -1;
+  padding: 8px 0 8px 10px;
+}
+
+.circuit-diagram {
+  align-items: center;
+  grid-template-columns: 44px minmax(96px, 1fr) 44px;
+}
+
+.circuit-diagram span,
+.circuit-diagram strong {
+  align-items: center;
+  border: 2px solid var(--primary);
+  border-radius: 8px;
+  color: var(--primary);
+  display: flex;
+  font-size: 14px;
+  font-weight: 900;
+  height: 44px;
+  justify-content: center;
+}
+
+.circuit-diagram strong {
+  background: #eef7f4;
+}
+
+.circuit-diagram em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 800;
+  grid-column: 1 / -1;
+  text-align: center;
+}
+
+.membrane-diagram {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr);
+}
+
+.membrane-diagram span {
+  align-items: center;
+  background: repeating-linear-gradient(180deg, rgba(22, 78, 65, 0.24), rgba(22, 78, 65, 0.24) 4px, transparent 4px, transparent 8px);
+  border-radius: 999px;
+  color: var(--primary);
+  display: flex;
+  font-size: 11px;
+  font-weight: 900;
+  height: 80px;
+  justify-content: center;
+}
+
+.lung-diagram {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.wave-diagram {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.wave-diagram span {
+  border-bottom: 4px solid var(--primary);
+  border-radius: 50%;
+  height: 32px;
+}
+
+.wave-diagram strong {
+  color: var(--primary);
+  font-size: 13px;
+  grid-column: 1 / -1;
+  text-align: center;
+}
+
 @media (max-width: 380px) {
-  .formula-diagram {
+  .formula-diagram,
+  .balance-diagram,
+  .circulation-diagram {
     grid-template-columns: 1fr;
   }
 }

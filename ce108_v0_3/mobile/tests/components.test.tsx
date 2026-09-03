@@ -62,4 +62,37 @@ describe("mobile components", () => {
     expect(screen.getByText(/右心房/)).toBeInTheDocument();
     expect(screen.getAllByText("房室結節").length).toBeGreaterThanOrEqual(1);
   });
+
+  it("renders acid-base visual aids", () => {
+    render(
+      <VisualAidCard
+        aid={{
+          title: "酸塩基の見分け方",
+          kind: "acidbase",
+          steps: ["pH", "PaCO2", "HCO3-", "一次性変化"],
+          summary: "pH、PaCO2、HCO3-を分けて確認します。",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("酸塩基の見分け方")).toBeInTheDocument();
+    expect(screen.getByText("呼吸性")).toBeInTheDocument();
+    expect(screen.getByText("代謝性")).toBeInTheDocument();
+  });
+
+  it("renders circuit visual aids", () => {
+    render(
+      <VisualAidCard
+        aid={{
+          title: "回路問題の見取り図",
+          kind: "circuit",
+          steps: ["電圧", "電流", "抵抗", "接続"],
+          summary: "V、I、Rを確認します。",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("回路問題の見取り図")).toBeInTheDocument();
+    expect(screen.getByText("V = I R")).toBeInTheDocument();
+  });
 });

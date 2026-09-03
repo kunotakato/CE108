@@ -167,22 +167,61 @@ def _visual_aid(title:str,kind:str,steps:list[str],summary:str,formula:dict[str,
     if formula:aid['formula']=formula
     return aid
 
+def _numeric_formula(q:dict,default:dict[str,str])->dict[str,str]:
+    text=str(q.get('question_text') or '')
+    answer=q.get('numeric_answer')
+    unit=q.get('unit') or ''
+    if answer is not None:
+        default['result']=f'{answer:g} {unit}'.strip()
+    nums=re.findall(r'\d+(?:\.\d+)?',text)
+    if len(nums)>=2 and ('圧力' in text or 'P=F/A' in text or 'P＝F/A' in text):
+        default.update({'given':f'F={nums[0]} N、A={nums[1]} m²','substitution':f'{nums[0]} / {nums[1]}'})
+    elif len(nums)>=2 and ('分時換気量' in text or '一回換気量' in text):
+        default.update({'given':f'VT={nums[0]} mL、呼吸数={nums[1]} 回/min','formula':'分時換気量 = VT × 呼吸数','substitution':f'{nums[0]} × {nums[1]} / 1000'})
+    elif len(nums)>=2 and ('心拍出量' in text or '一回拍出量' in text):
+        default.update({'given':f'心拍数={nums[0]} 回/min、一回拍出量={nums[1]} mL','formula':'心拍出量 = 心拍数 × 一回拍出量','substitution':f'{nums[0]} × {nums[1]} / 1000'})
+    elif nums and ('周期' in text or 'T=1/f' in text or 'T＝1/f' in text):
+        default.update({'given':f'f={nums[0]} Hz','formula':'T = 1 / f','substitution':f'1 / {nums[0]}'})
+    elif len(nums)>=2 and ('電力' in text or 'P=I' in text or 'P＝I' in text):
+        default.update({'given':f'I={nums[0]} A、R={nums[1]} Ω','formula':'P = I² R','substitution':f'{nums[0]}² × {nums[1]}'})
+    elif len(nums)>=2 and ('流量' in text and 'ml/s' in text.lower()):
+        default.update({'given':f'{nums[0]} L/min','formula':'mL/s = L/min × 1000 / 60','substitution':f'{nums[0]} × 1000 / 60'})
+    elif len(nums)>=2 and ('尿量' in text):
+        default.update({'given':f'{nums[0]} mL/kg/h、体重={nums[1]} kg','formula':'尿量 = mL/kg/h × 体重','substitution':f'{nums[0]} × {nums[1]}'})
+    elif len(nums)>=2 and ('%' in text or '％' in text):
+        default.update({'given':'問題文の数値を確認','formula':'割合 = 部分 / 全体 × 100','substitution':'条件に合わせて代入'})
+    return default
+
 def _question_visual_aid(q:dict)->dict[str,Any]:
     text=' '.join(str(q.get(k) or '') for k in ('question_text','explanation_short','explanation_standard','topic_name','subject_name')).lower()
+    if q.get('question_type')=='numeric' and any(k in text for k in ('心拍出量','一回拍出量','分時換気量','一回換気量','尿量','出血量','%','％')):
+        return _visual_aid('計算問題の見取り図','calculation',['条件を拾う','公式を選ぶ','単位をそろえる','代入する','答えの桁を見る'],'数値問題は、文章中の条件を先に並べ、公式と単位を確認してから計算します。',_numeric_formula(q,{'given':'問題文の条件を確認','formula':'該当する基本式','substitution':'条件を代入','result':'答え'}))
+    if any(k in text for k in ('p波','qrs','心電図','rr間隔','st上昇','u波','テント状t波')):
+        return _visual_aid('心電図波形で見る判断点','signal',['P波: 心房の興奮','QRS: 心室の興奮','T波: 心室の回復','幅や高さの異常を見る','電解質・伝導障害と結ぶ'],'心電図問題は、どの波がどの電気活動を表すかを先に固定すると判断しやすくなります。')
+    if any(k in text for k in ('アシドーシス','アルカローシス','hco3','paco2','酸塩基','kussmaul')):
+        return _visual_aid('酸塩基の見分け方','acidbase',['pHで酸性/アルカリ性','PaCO2を見る','HCO3-を見る','一次性変化を決める','代償を確認する'],'酸塩基はpH、PaCO2、HCO3-の順に分けると、呼吸性か代謝性かを整理できます。')
+    if any(k in text for k in ('ショック','血圧低下','循環血液量','前負荷','後負荷','心拍出量','末梢血管抵抗','心不全','肺うっ血')):
+        return _visual_aid('循環不全の原因整理','circulation',['血液量を見る','ポンプ機能を見る','血管抵抗を見る','組織灌流を確認','原因別に対処を考える'],'ショックや心不全は、血液量、心臓のポンプ、血管抵抗のどこが崩れたかで整理します。')
     if any(k in text for k in ('洞房結節','房室結節','his束','purkinje','刺激伝導')):
         return _visual_aid('心臓の中で見る刺激伝導','anatomy',['右心房の洞房結節','房室結節で一度受ける','His束を通る','右脚・左脚に分かれる','Purkinje線維で心室へ広がる'],'洞房結節は右心房側にある最初のペースメーカーです。心臓の中の位置と伝わる順番を一緒に覚えます。')
-    if any(k in text for k in ('肺胞','paco2','二酸化炭素','酸素','換気','拡散')):
+    if any(k in text for k in ('人工呼吸','peep','fio2','一回換気量','分時換気量','換気量')):
+        return _visual_aid('人工呼吸設定の見取り図','ventilation',['FiO2で酸素濃度','VTで1回量','呼吸数で回数','PEEPで終末陽圧','酸素化と換気を分ける'],'人工呼吸は、酸素化に関わる設定とCO2排出に関わる換気設定を分けて理解します。')
+    if any(k in text for k in ('透析','限外濾過','除水','透析膜','シャント')):
+        return _visual_aid('透析で起きる移動','dialysis',['血液側','透析膜','透析液側','拡散で小分子','圧差で水分'],'小分子は濃度差で拡散し、水分は圧差で限外濾過されます。何が何の差で動くかを分けて覚えます。')
+    if any(k in text for k in ('肺胞','二酸化炭素','酸素','換気','拡散')):
         return _visual_aid('肺胞でのガス交換','exchange',['肺胞気','分圧差','肺胞膜','毛細血管','換気でCO2排出'],'肺胞と血液の間では、分圧差に沿って酸素と二酸化炭素が移動します。換気不足ではCO2が上がりやすくなります。')
     if 'p＝f/a' in text or 'p=f/a' in text or ('圧力' in text and 'pa' in text):
-        return _visual_aid('圧力計算のイメージ','calculation',['力Fを確認','面積Aを確認','P=F/Aに代入','単位Paで答える'],'圧力は、同じ力でも面積が小さいほど大きくなります。力を面積で割る場面としてイメージします。',{'given':'F=100 N、A=0.02 m²','formula':'P = F / A','substitution':'100 / 0.02 = 5,000','result':'5,000 Pa'})
+        return _visual_aid('圧力計算のイメージ','calculation',['力Fを確認','面積Aを確認','P=F/Aに代入','単位Paで答える'],'圧力は、同じ力でも面積が小さいほど大きくなります。力を面積で割る場面としてイメージします。',_numeric_formula(q,{'given':'FとAを確認','formula':'P = F / A','substitution':'F / A','result':'Pa'}))
     if 't＝1/f' in text or 't=1/f' in text or ('周期' in text and 'hz' in text):
-        return _visual_aid('周波数と周期のイメージ','calculation',['1秒間の波の数を見る','周期は1回分の時間','T=1/fに代入','秒で答える'],'Hzは1秒あたりの回数です。周期は1回にかかる時間なので、周波数の逆数になります。',{'given':'f=50 Hz','formula':'T = 1 / f','substitution':'1 / 50 = 0.02','result':'0.02 秒'})
+        return _visual_aid('周波数と周期のイメージ','calculation',['1秒間の波の数を見る','周期は1回分の時間','T=1/fに代入','秒で答える'],'Hzは1秒あたりの回数です。周期は1回にかかる時間なので、周波数の逆数になります。',_numeric_formula(q,{'given':'fを確認','formula':'T = 1 / f','substitution':'1 / f','result':'秒'}))
     if 'p＝i²r' in text or 'p=i' in text and 'r' in text:
-        return _visual_aid('電力計算のイメージ','calculation',['電流Iを確認','抵抗Rを確認','P=I²Rに代入','Wで答える'],'抵抗で消費される電力は、電流の二乗に比例します。電流を二乗してから抵抗を掛けます。',{'given':'I=0.5 A、R=10 Ω','formula':'P = I² R','substitution':'0.5² × 10 = 2.5','result':'2.5 W'})
+        return _visual_aid('電力計算のイメージ','calculation',['電流Iを確認','抵抗Rを確認','P=I²Rに代入','Wで答える'],'抵抗で消費される電力は、電流の二乗に比例します。電流を二乗してから抵抗を掛けます。',_numeric_formula(q,{'given':'IとRを確認','formula':'P = I² R','substitution':'I² × R','result':'W'}))
+    if any(k in text for k in ('電圧','電流','抵抗','オーム','直列','並列','合成抵抗','電圧計','電流計')):
+        return _visual_aid('回路問題の見取り図','circuit',['電圧Vを確認','電流Iを確認','抵抗Rを確認','直列/並列を判定','式に代入する'],'回路問題は、V、I、Rのどれが与えられ、接続が直列か並列かを先に分けます。')
+    if any(k in text for k in ('フィルタ','サンプリング','cmrr','商用交流雑音','リアクタンス','コンデンサ','インダクタンス')):
+        return _visual_aid('信号処理の判断マップ','signal',['信号の周波数','雑音の周波数','フィルタの向き','サンプリング条件','測定への影響'],'信号問題は、通したい成分と落としたい成分を周波数で分けると整理しやすくなります。')
     if any(k in text for k in ('腎小体','糸球体','原尿','濾過','腎')):
         return _visual_aid('腎小体の濾過','flow',['輸入細動脈','糸球体','濾過膜','Bowman嚢','原尿'],'血液から濾過膜を通って原尿が作られる流れを押さえると、腎機能の問題を整理しやすくなります。')
-    if any(k in text for k in ('透析','限外濾過','除水','透析膜','シャント')):
-        return _visual_aid('透析で起きる移動','exchange',['血液側','透析膜','透析液側','拡散','限外濾過'],'小分子は濃度差で拡散し、水分は圧差で限外濾過されます。何が何の差で動くかを分けて覚えます。')
     if any(k in text for k in ('ヘモグロビン','酸素運搬','血液')):
         return _visual_aid('酸素運搬の見取り図','flow',['肺胞','赤血球','ヘモグロビン','動脈血','組織'],'酸素は肺で血液に取り込まれ、主にヘモグロビンと結合して組織へ運ばれます。')
     return _visual_aid('正答根拠の見取り図','map',['問題文の条件','正答根拠','誤答との差分','次に解く関連問題'],'文章だけで終わらせず、条件・根拠・誤答との差分を一列に並べて確認します。')

@@ -72,7 +72,7 @@ export type AnswerPayload = {
 
 export type VisualAid = {
   title: string;
-  kind: "flow" | "exchange" | "map" | "anatomy" | "calculation";
+  kind: "flow" | "exchange" | "map" | "anatomy" | "calculation" | "acidbase" | "circulation" | "circuit" | "dialysis" | "ventilation" | "signal";
   steps: string[];
   summary: string;
   formula?: {

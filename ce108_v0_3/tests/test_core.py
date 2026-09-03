@@ -12,6 +12,7 @@ from ce108.admin_service import approve_question, create_question, import_questi
 from ce108.database import connect, fetch_all, fetch_one
 from ce108.security import hash_password
 from ce108.seed import seed_database
+from scripts.export_question_review_csv import export_review_csv
 from ce108.services import (
     answer_diagnostic,
     authenticate_user,
@@ -140,6 +141,22 @@ class TestCore(unittest.TestCase):
         self.assertIn('formula', result['question']['visual_aid'])
         self.assertIn('P = F / A', result['question']['visual_aid']['formula']['formula'])
 
+    def test_visual_aid_variants_cover_exam_like_topics(self):
+        cases = [
+            ("SELECT id FROM questions WHERE question_text LIKE '%P波%' ORDER BY id LIMIT 1", 'signal'),
+            ("SELECT id FROM questions WHERE question_text LIKE '%アシドーシス%' ORDER BY id LIMIT 1", 'acidbase'),
+            ("SELECT id FROM questions WHERE question_text LIKE '%ショック%' ORDER BY id LIMIT 1", 'circulation'),
+            ("SELECT id FROM questions WHERE question_text LIKE '%電圧計%' ORDER BY id LIMIT 1", 'circuit'),
+            ("SELECT id FROM questions WHERE question_text LIKE '%透析%' ORDER BY id LIMIT 1", 'dialysis'),
+            ("SELECT id FROM questions WHERE question_text LIKE '%PEEP%' ORDER BY id LIMIT 1", 'ventilation'),
+        ]
+        for sql, kind in cases:
+            with self.subTest(kind=kind):
+                row = fetch_one(sql, (), self.db)
+                q = get_question(row['id'], self.db)
+                result = record_answer(self.student['id'], q['id'], q.get('correct_codes') or [], q.get('numeric_answer'), 'たぶん分かる', 30, 'test', db_path=self.db)
+                self.assertEqual(result['question']['visual_aid']['kind'], kind)
+
     def test_mastery_is_updated(self):
         q = get_question(1, self.db)
         record_answer(self.student['id'], q['id'], q['correct_codes'], None, 'たぶん分かる', 45, 'test', db_path=self.db)
@@ -174,6 +191,13 @@ class TestCore(unittest.TestCase):
         empty = fetch_one("SELECT COUNT(*) total FROM question_choices WHERE TRIM(COALESCE(explanation,''))=''", (), self.db)['total']
         self.assertGreaterEqual(total, 140)
         self.assertEqual(empty, 0)
+
+    def test_question_review_csv_export(self):
+        output = Path(self.t.name) / 'question_review_export.csv'
+        export_review_csv(output, self.db)
+        text = output.read_text(encoding='utf-8-sig')
+        self.assertIn('medical_engineering_review', text)
+        self.assertIn('国試風オリジナル', text)
 
     def test_seed_adds_missing_questions_to_existing_database(self):
         text = '血圧を規定する要素として最も基本的な組合せはどれか。'

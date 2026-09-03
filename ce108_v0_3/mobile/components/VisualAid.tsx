@@ -41,6 +41,53 @@ export function VisualAidCard({ aid }: { aid?: VisualAid | null }) {
           <div><span>答え</span><strong>{aid.formula.result}</strong></div>
         </div>
       ) : null}
+      {aid.kind === "acidbase" ? (
+        <div className="balance-diagram">
+          <div><span>pH</span><strong>酸性/アルカリ性</strong></div>
+          <div><span>PaCO2</span><strong>呼吸性</strong></div>
+          <div><span>HCO3-</span><strong>代謝性</strong></div>
+        </div>
+      ) : null}
+      {aid.kind === "circulation" ? (
+        <div className="circulation-diagram">
+          <div>血液量</div>
+          <div>ポンプ</div>
+          <div>血管抵抗</div>
+          <strong>組織灌流</strong>
+        </div>
+      ) : null}
+      {aid.kind === "circuit" ? (
+        <div className="circuit-diagram">
+          <span>V</span>
+          <strong>R</strong>
+          <span>I</span>
+          <em>V = I R</em>
+        </div>
+      ) : null}
+      {aid.kind === "dialysis" ? (
+        <div className="membrane-diagram">
+          <div>血液側</div>
+          <span>膜</span>
+          <div>透析液側</div>
+          <strong>拡散 / 限外濾過</strong>
+        </div>
+      ) : null}
+      {aid.kind === "ventilation" ? (
+        <div className="lung-diagram">
+          <div>FiO2</div>
+          <div>VT</div>
+          <div>RR</div>
+          <div>PEEP</div>
+        </div>
+      ) : null}
+      {aid.kind === "signal" ? (
+        <div className="wave-diagram">
+          <span />
+          <span />
+          <span />
+          <strong>周波数・波形・雑音</strong>
+        </div>
+      ) : null}
       <p className="visual-aid-summary">{aid.summary}</p>
     </section>
   );

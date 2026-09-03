@@ -102,6 +102,8 @@
 - 復習画面から回答済み問題の解説、図解、誤答選択肢理由を再表示
 - 学習履歴画面から直近回答の解説、図解、誤答選択肢理由を再表示
 - 医学・工学の国試風オリジナル問題を追加
+- 酸塩基、循環不全、回路、透析、換気、信号処理の図解パターンを追加
+- 専門監修用CSVエクスポートと再検収チェックリストを追加
 
 ## 重要事項
 
@@ -246,6 +248,9 @@ docs/EXTERNAL_BETA_GUIDE.md
 docs/FIRST_TESTER_ACCEPTANCE_CHECKLIST.md
 docs/NOTE_OCR_IMAGE_AI_DESIGN.md
 docs/ADMIN_FEEDBACK_OPERATIONS.md
+docs/ADMIN_STREAMLIT_RENDER_DECISION.md
+docs/FIRST_TESTER_RECHECK_CHECKLIST.md
+docs/QUESTION_REVIEW_REPORT.md
 docs/QUESTION_AUTHORING_GUIDE.md
 ```
 
