@@ -34,6 +34,7 @@ function StudyPageContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const answerResultRef = useRef<HTMLDivElement | null>(null);
 
   const items = useMemo(() => plan?.items.slice(0, 5) ?? [], [plan]);
   const sessionKey = useMemo(() => (plan ? buildSessionKey(plan, mode) : "unloaded"), [mode, plan]);
@@ -97,6 +98,12 @@ function StudyPageContent() {
       setQuestion(null);
     }
   }, [currentQuestionId]);
+
+  useEffect(() => {
+    if (result && answerResultRef.current) {
+      answerResultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [result]);
 
   function toggleChoice(code: string) {
     if (!question || result) return;
@@ -238,12 +245,15 @@ function StudyPageContent() {
         </section>
         {error ? <ErrorState message={error} /> : null}
         {result ? (
-          <section className="panel stack">
+          <section className="panel stack answer-result" ref={answerResultRef}>
+            <div className="result-heading">
+              <span className="pill">解説と図解</span>
+              <span className="pill">{result.question.answer_statistics?.label || "回答を保存しました"}</span>
+            </div>
             <h2 className={result.is_correct ? "correct" : "incorrect"}>{result.is_correct ? "正解です" : "復習しましょう"}</h2>
-            {result.question.learning_point || result.question.answer_statistics ? (
+            {result.question.learning_point ? (
               <div className="pill-row">
-                {result.question.learning_point ? <span className="pill">学習ポイント</span> : null}
-                {result.question.answer_statistics ? <span className="pill">{result.question.answer_statistics.label}</span> : null}
+                <span className="pill">学習ポイント</span>
               </div>
             ) : null}
             {result.question.learning_point ? <p className="lead-small">{result.question.learning_point}</p> : null}
