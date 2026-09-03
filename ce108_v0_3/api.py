@@ -26,9 +26,11 @@ from ce108.services import (
     get_focus_plan,
     get_diagnostic_state,
     get_admin_quality_summary,
+    get_answered_question_detail,
     get_beta_feedback_summary,
     get_beta_tester_activity,
     get_daily_status,
+    get_learning_history,
     get_question,
     get_learning_summary,
     get_mastery_report,
@@ -215,6 +217,14 @@ def daily_status(count: int = 5, user=Depends(require_role('student'))):
 @app.get('/api/study/reviews')
 def review_queue(limit: int = 20, user=Depends(require_role('student'))):
     return get_review_queue(user['id'], limit=limit)
+
+@app.get('/api/study/history')
+def study_history(limit: int = 50, user=Depends(require_role('student'))):
+    return get_learning_history(user['id'], limit=limit)
+
+@app.get('/api/study/answered-questions/{qid}')
+def answered_question(qid: int, user=Depends(require_role('student'))):
+    return get_answered_question_detail(user['id'], qid)
 
 @app.get('/api/study/summary')
 def study_summary(user=Depends(require_role('student'))):

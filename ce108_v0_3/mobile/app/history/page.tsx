@@ -5,39 +5,35 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { AnswerReviewPanel } from "@/components/AnswerReviewPanel";
 import { EmptyState, ErrorState, LoadingState } from "@/components/StateViews";
-import { getAnsweredQuestion, getReviewQueue } from "@/lib/api";
+import { getAnsweredQuestion, getHistory } from "@/lib/api";
 import { getToken } from "@/lib/auth";
-import type { AnswerResult, ReviewQueue } from "@/lib/types";
+import type { AnswerResult, LearningHistory } from "@/lib/types";
 
-export default function ReviewsPage() {
-  const [queue, setQueue] = useState<ReviewQueue | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+export default function HistoryPage() {
+  const [history, setHistory] = useState<LearningHistory | null>(null);
   const [details, setDetails] = useState<Record<number, AnswerResult>>({});
-  const [detailError, setDetailError] = useState("");
+  const [loading, setLoading] = useState(true);
   const [detailLoadingId, setDetailLoadingId] = useState<number | null>(null);
+  const [error, setError] = useState("");
+  const [detailError, setDetailError] = useState("");
 
   async function load() {
     const token = getToken();
     if (!token) {
-      setError("ログイン情報が見つかりません。");
+      setError("ログイン情報が見つかりません。ログインし直してください。");
       setLoading(false);
       return;
     }
     setLoading(true);
     setError("");
     try {
-      setQueue(await getReviewQueue(token, 20));
+      setHistory(await getHistory(token, 50));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "復習予定を読み込めませんでした。");
+      setError(err instanceof Error ? err.message : "学習履歴を読み込めませんでした。");
     } finally {
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    void load();
-  }, []);
 
   async function showDetail(questionId: number) {
     const token = getToken();
@@ -58,29 +54,36 @@ export default function ReviewsPage() {
     }
   }
 
+  useEffect(() => {
+    void load();
+  }, []);
+
   return (
-    <AppShell title="復習">
+    <AppShell title="学習履歴">
       <section className="hero stack">
-        <p className="eyebrow">Review Queue</p>
-        <h1>今日の復習を片づけましょう。</h1>
-        <p className="lead">今日までの復習 {queue?.due_count ?? 0} 件、今後の予定 {queue?.upcoming_count ?? 0} 件。</p>
-        <Link className="primary-button" href="/study">今日の5問へ進む</Link>
+        <p className="eyebrow">History</p>
+        <h1>解いた問題を見返す。</h1>
+        <p className="lead">直近50件の回答から、解説・図解・誤答選択肢の理由を確認できます。</p>
+        <Link className="secondary-button" href="/home">ホームへ戻る</Link>
       </section>
       {loading ? <LoadingState /> : null}
       {error ? <ErrorState message={error} onRetry={load} /> : null}
       {detailError ? <ErrorState message={detailError} /> : null}
-      {!loading && !error && queue?.items.length === 0 ? <EmptyState message="復習予定はありません。今日の5問から始めましょう。" /> : null}
+      {!loading && !error && history?.items.length === 0 ? <EmptyState message="まだ回答履歴がありません。今日の5問から始めましょう。" /> : null}
       <div className="stack">
-        {queue?.items.map((item) => (
-          <div className="stack" key={item.review_id}>
+        {history?.items.map((item) => (
+          <div className="stack" key={item.id}>
             <section className="panel stack">
               <div className="pill-row">
-                <span className="pill">{item.review_label}</span>
+                <span className={`pill ${item.is_correct ? "pill-success" : "pill-danger"}`}>{item.is_correct ? "正解" : "誤答"}</span>
                 <span className="pill">{item.subject_name}</span>
+                <span className="pill">{item.answer_mode}</span>
               </div>
               <h2>{item.topic_name}</h2>
               <p className="lead">{item.question_text}</p>
-              <p className="muted">{item.reason} / 予定日: {item.scheduled_date}</p>
+              <p className="muted">
+                回答日時: {item.answered_at} / 自信度: {item.confidence_level} / {item.response_time_seconds}秒
+              </p>
               <button className="secondary-button" type="button" onClick={() => showDetail(item.question_id)}>
                 {detailLoadingId === item.question_id ? "読み込み中" : details[item.question_id] ? "解説を表示中" : "解説と図解を見る"}
               </button>

@@ -703,6 +703,16 @@ h3 {
   padding: 6px 10px;
 }
 
+.pill-success {
+  background: #e8f4ec;
+  color: var(--success);
+}
+
+.pill-danger {
+  background: #fbebe9;
+  color: var(--danger);
+}
+
 .week-row {
   display: grid;
   gap: 6px;

@@ -3,6 +3,7 @@ import csv
 from pathlib import Path
 from .config import DATA_DIR, DB_PATH
 from .database import connect, initialize_database, utc_now
+from .original_question_bank import EXPANDED_ORIGINAL_QUESTIONS
 from .security import hash_password
 
 SUBJECTS=[('MED','医学概論・基礎医学'),('EEE','医用電気電子工学'),('MECH','医用機械工学・物理数学'),('MAT','生体物性材料工学'),('SUP','生体機能代行装置学'),('THER','医用治療機器学'),('MEAS','生体計測装置学'),('SAFE','医用機器安全管理学'),('CLIN','臨床医学総論')]
@@ -64,6 +65,7 @@ C('MECH-FLUID','流体抵抗が大きくなる条件として最も適切なの�
 C('MEAS-SPO2','パルスオキシメータで測定値が不安定になりやすい状況はどれか。',['末梢循環不全','安静で十分な脈波がある状態','センサが適切に装着されている状態','体動が全くない状態','爪に何も塗布されていない状態'],[1],'末梢循環不全では脈波が小さくなり、SpO2測定が不安定になりやすくなります。',5,3,'single',['末梢循環不全では脈動成分が弱くなり、測定不良につながります。','十分な脈波があれば測定は安定しやすくなります。','適切な装着は測定安定に寄与します。','体動がないことは測定安定に寄与します。','爪の塗布物がないことは光学測定の妨げを減らします。']),
 C('THER-DEF','同期カルディオバージョンで同期が必要な主な理由はどれか。',['脆弱期への通電を避けるため','充電時間を必ずゼロにするため','電極を不要にするため','血圧計として使うため','酸素濃度を測るため'],[1],'同期によりR波に合わせて通電し、心室細動を誘発しやすい時相を避けます。',5,3,'single',['同期はR波に合わせ、脆弱期通電を避けるために重要です。','充電時間をゼロにする機能ではありません。','電極は通電に必要です。','血圧測定機能ではありません。','酸素濃度測定はパルスオキシメータなどの役割です。']),
 ]
+QUESTIONS.extend(EXPANDED_ORIGINAL_QUESTIONS)
 
 def seed_database(db_path:Path|str=DB_PATH):
     initialize_database(db_path)

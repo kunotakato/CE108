@@ -227,6 +227,61 @@ def record_answer(user_id:int,question_id:int,selected_codes:list[str]|None,nume
     q['visual_aid']=_question_visual_aid(q)
     return {'is_correct':correct,'review_date':review,'question':q,'related_questions':related_questions(user_id,question_id,db_path=db_path)}
 
+def _parse_selected_codes(value:str|None)->list[str]:
+    if not value:return []
+    try:
+        parsed=json.loads(value)
+        return [str(v) for v in parsed] if isinstance(parsed,list) else []
+    except Exception:
+        return []
+
+def get_answered_question_detail(user_id:int,question_id:int,db_path:Path|str=DB_PATH):
+    latest=fetch_one('''SELECT * FROM answer_history WHERE user_id=? AND question_id=? ORDER BY answered_at DESC,id DESC LIMIT 1''',(user_id,question_id),db_path)
+    if not latest:raise ValueError('この問題の回答履歴がありません。')
+    q=get_question(question_id,db_path)
+    if not q:raise ValueError('問題が見つかりません。')
+    selected_codes=_parse_selected_codes(latest['selected_answer'])
+    review=fetch_one('''SELECT scheduled_date FROM review_schedules WHERE user_id=? AND question_id=? ORDER BY scheduled_date DESC,id DESC LIMIT 1''',(user_id,question_id),db_path)
+    q['choice_feedback']=_choice_feedback(q,selected_codes)
+    q['learning_point']=_question_learning_point(q)
+    q['answer_statistics']=_answer_statistics(question_id,db_path)
+    q['visual_aid']=_question_visual_aid(q)
+    return {
+        'is_correct':bool(latest['is_correct']),
+        'review_date':review['scheduled_date'] if review else None,
+        'latest_answer':{
+            'id':latest['id'],
+            'selected_codes':selected_codes,
+            'numeric_answer':latest['numeric_answer'],
+            'confidence':latest['confidence_level'],
+            'response_time_seconds':latest['response_time_seconds'],
+            'answer_mode':latest['answer_mode'],
+            'answered_at':latest['answered_at'],
+        },
+        'question':q,
+        'related_questions':related_questions(user_id,question_id,db_path=db_path),
+    }
+
+def get_learning_history(user_id:int,limit:int=50,db_path:Path|str=DB_PATH):
+    rows=fetch_all('''SELECT a.id,a.question_id,a.selected_answer,a.numeric_answer,a.is_correct,a.confidence_level,
+        a.response_time_seconds,a.answer_mode,a.answered_at,q.question_text,q.question_type,s.name subject_name,t.name topic_name,
+        (SELECT scheduled_date FROM review_schedules r WHERE r.user_id=a.user_id AND r.question_id=a.question_id ORDER BY r.scheduled_date DESC,r.id DESC LIMIT 1) review_date
+        FROM answer_history a
+        JOIN questions q ON q.id=a.question_id
+        LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary'
+        LEFT JOIN topics t ON t.id=m.topic_id
+        LEFT JOIN subjects s ON s.id=t.subject_id
+        WHERE a.user_id=?
+        ORDER BY a.answered_at DESC,a.id DESC
+        LIMIT ?''',(user_id,max(1,min(int(limit or 50),200))),db_path)
+    items=[]
+    for r in rows:
+        d=dict(r)
+        d['selected_codes']=_parse_selected_codes(d.pop('selected_answer'))
+        d['is_correct']=bool(d['is_correct'])
+        items.append(d)
+    return {'items':items,'total':len(items)}
+
 def _count(minutes:int)->int:return max(3,min(20,round(minutes/3)))
 
 def _limit_plan_items(plan:dict|None,count:int|None):

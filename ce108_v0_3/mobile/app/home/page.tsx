@@ -113,6 +113,7 @@ export default function HomePage() {
         <h2>いま優先する分野</h2>
         <p className="lead">{nextWeak ? `${nextWeak.subject_name} / ${nextWeak.topic_name}` : "回答が増えると苦手分野を表示します。"}</p>
         <Link className="secondary-button" href="/mastery">理解度を見る</Link>
+        <Link className="secondary-button" href="/history">学習履歴を見る</Link>
       </section>
       <section className="panel stack">
         <h2>ノートから問題作成</h2>

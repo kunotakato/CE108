@@ -4,6 +4,7 @@ import type {
   DailyStatus,
   FeedbackPayload,
   DailyPlan,
+  LearningHistory,
   LearningSummary,
   LoginResponse,
   MasteryRow,
@@ -86,6 +87,14 @@ export async function getDailyStatus(token: string, count = 5) {
 
 export async function getReviewQueue(token: string, limit = 20) {
   return apiFetch<ReviewQueue>(`/api/study/reviews?limit=${limit}`, { token });
+}
+
+export async function getHistory(token: string, limit = 50) {
+  return apiFetch<LearningHistory>(`/api/study/history?limit=${limit}`, { token });
+}
+
+export async function getAnsweredQuestion(token: string, questionId: number) {
+  return apiFetch<AnswerResult>(`/api/study/answered-questions/${questionId}`, { token });
 }
 
 export async function getSummary(token: string) {

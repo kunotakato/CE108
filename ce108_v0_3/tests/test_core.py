@@ -20,9 +20,11 @@ from ce108.services import (
     generate_daily_plan,
     get_focus_plan,
     get_admin_quality_summary,
+    get_answered_question_detail,
     get_beta_feedback_summary,
     get_beta_tester_activity,
     get_daily_status,
+    get_learning_history,
     get_diagnostic_state,
     get_mastery_report,
     get_note_question,
@@ -105,6 +107,27 @@ class TestCore(unittest.TestCase):
         self.assertIn('正答の', selected_feedback[0]['explanation'])
         self.assertIn('related_questions', result)
 
+    def test_answered_question_detail_requires_history_and_returns_explanation(self):
+        q = get_question(1, self.db)
+        with self.assertRaises(ValueError):
+            get_answered_question_detail(self.student['id'], q['id'], self.db)
+        record_answer(self.student['id'], q['id'], q['correct_codes'], None, '迷った', 40, 'daily', db_path=self.db)
+        detail = get_answered_question_detail(self.student['id'], q['id'], self.db)
+        self.assertTrue(detail['is_correct'])
+        self.assertIn('visual_aid', detail['question'])
+        self.assertIn('choice_feedback', detail['question'])
+        self.assertIn('explanation_standard', detail['question'])
+        self.assertEqual(detail['latest_answer']['selected_codes'], q['correct_codes'])
+
+    def test_learning_history_contains_recent_answers(self):
+        q = get_question(1, self.db)
+        record_answer(self.student['id'], q['id'], q['correct_codes'], None, 'たぶん分かる', 30, 'daily', db_path=self.db)
+        history = get_learning_history(self.student['id'], 10, self.db)
+        self.assertEqual(history['total'], 1)
+        self.assertEqual(history['items'][0]['question_id'], q['id'])
+        self.assertTrue(history['items'][0]['is_correct'])
+        self.assertEqual(history['items'][0]['selected_codes'], q['correct_codes'])
+
     def test_numeric_tolerance(self):
         q = next(get_question(r['id'], self.db) for r in fetch_all("SELECT id FROM questions WHERE question_type='numeric'", (), self.db))
         self.assertTrue(check_answer(q, [], q['numeric_answer'] + (q['numeric_tolerance'] / 2)))
@@ -149,7 +172,7 @@ class TestCore(unittest.TestCase):
     def test_seed_contains_expanded_original_questions_with_choice_explanations(self):
         total = fetch_one('SELECT COUNT(*) total FROM questions', (), self.db)['total']
         empty = fetch_one("SELECT COUNT(*) total FROM question_choices WHERE TRIM(COALESCE(explanation,''))=''", (), self.db)['total']
-        self.assertGreaterEqual(total, 49)
+        self.assertGreaterEqual(total, 140)
         self.assertEqual(empty, 0)
 
     def test_seed_adds_missing_questions_to_existing_database(self):
@@ -417,6 +440,21 @@ class TestApi(unittest.TestCase):
         res = self.client.get('/api/study/reviews', headers={'Authorization': f'Bearer {token}'})
         self.assertEqual(res.status_code, 200)
         self.assertIn('items', res.json())
+
+    def test_history_and_answered_detail_api(self):
+        token = self._token()
+        question = self.client.get('/api/questions/1', headers={'Authorization': f'Bearer {token}'}).json()
+        res = self.client.post('/api/questions/1/answer', headers={'Authorization': f'Bearer {token}'}, json={'selected_codes': ['1'], 'numeric_answer': None, 'confidence': 'たぶん分かる', 'response_time_seconds': 20, 'answer_mode': 'daily'})
+        self.assertEqual(res.status_code, 200, res.text)
+        history = self.client.get('/api/study/history', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(history.status_code, 200)
+        self.assertGreaterEqual(history.json()['total'], 1)
+        detail = self.client.get('/api/study/answered-questions/1', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(detail.status_code, 200, detail.text)
+        body = detail.json()
+        self.assertIn('visual_aid', body['question'])
+        self.assertIn('choice_feedback', body['question'])
+        self.assertNotIn('explanation_standard', json.dumps(question, ensure_ascii=False))
 
     def test_beta_feedback_api(self):
         token = self._token()

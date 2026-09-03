@@ -15,6 +15,7 @@
 - 1日後・3日後・7日後・14日後の復習登録
 - 苦手・得意分析
 - 学習履歴
+- 復習・履歴からの解説と図解の再表示
 - 教員課題一覧
 
 ### 教員機能
@@ -96,6 +97,12 @@
 - `NOTE_OCR_PROVIDER=disabled`では外部AIへ送信せず、理由が分かるエラーを返す
 - OCR本番接続前に、同意文言、保存期間、監査ログ、個人情報入力禁止の運用を確認する設計文書を追加
 
+### Study Review Visibility
+- 今日の5問の回答後に「解説と図解」へ自動スクロール
+- 復習画面から回答済み問題の解説、図解、誤答選択肢理由を再表示
+- 学習履歴画面から直近回答の解説、図解、誤答選択肢理由を再表示
+- 医学・工学の国試風オリジナル問題を追加
+
 ## 重要事項
 
 収録されている問題は、動作確認用のCE108オリジナルサンプルです。30問診断はこのサンプル問題群から重複なく生成します。国家試験過去問の原文は収録していません。
@@ -103,6 +110,8 @@
 過去問を公開する場合は、権利者、利用条件、出典、加工の有無を確認し、`question_sources.permission_status`を更新してください。
 
 医学・工学解説はMVP用サンプルです。正式公開前に、臨床工学技士・養成校教員等による監修が必要です。
+
+国試風オリジナル問題の作成ルールは`docs/QUESTION_AUTHORING_GUIDE.md`を参照してください。
 
 ## 起動方法
 
@@ -171,6 +180,8 @@ POST /api/questions/{qid}/answer
 GET  /api/study/today
 GET  /api/study/daily-status
 GET  /api/study/reviews
+GET  /api/study/history
+GET  /api/study/answered-questions/{qid}
 GET  /api/study/summary
 GET  /api/study/mastery
 POST /api/diagnostics/start
@@ -234,6 +245,8 @@ docs/RENDER_DEPLOYMENT.md
 docs/EXTERNAL_BETA_GUIDE.md
 docs/FIRST_TESTER_ACCEPTANCE_CHECKLIST.md
 docs/NOTE_OCR_IMAGE_AI_DESIGN.md
+docs/ADMIN_FEEDBACK_OPERATIONS.md
+docs/QUESTION_AUTHORING_GUIDE.md
 ```
 
 ## Mobile v0.4.4
@@ -313,6 +326,7 @@ ce108_v0_3/
 │   ├── admin_service.py
 │   ├── config.py
 │   ├── database.py
+│   ├── original_question_bank.py
 │   ├── security.py
 │   ├── seed.py
 │   └── services.py

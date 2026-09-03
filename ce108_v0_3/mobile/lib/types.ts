@@ -85,7 +85,16 @@ export type VisualAid = {
 
 export type AnswerResult = {
   is_correct: boolean;
-  review_date: string;
+  review_date: string | null;
+  latest_answer?: {
+    id: number;
+    selected_codes: string[];
+    numeric_answer?: number | null;
+    confidence: string;
+    response_time_seconds: number;
+    answer_mode: string;
+    answered_at: string;
+  };
   question: Question & {
     correct_codes?: string[];
     explanation_short?: string;
@@ -112,6 +121,28 @@ export type AnswerResult = {
     topic_name: string;
     answered: number;
   }>;
+};
+
+export type LearningHistoryItem = {
+  id: number;
+  question_id: number;
+  numeric_answer?: number | null;
+  is_correct: boolean;
+  confidence_level: string;
+  response_time_seconds: number;
+  answer_mode: string;
+  answered_at: string;
+  question_text: string;
+  question_type: QuestionType;
+  subject_name?: string | null;
+  topic_name?: string | null;
+  review_date?: string | null;
+  selected_codes: string[];
+};
+
+export type LearningHistory = {
+  items: LearningHistoryItem[];
+  total: number;
 };
 
 export type LearningSummary = {

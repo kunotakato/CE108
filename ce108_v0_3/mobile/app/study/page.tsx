@@ -140,7 +140,7 @@ function StudyPageContent() {
         subjectName: question.subject_name,
         topicName: question.topic_name,
         isCorrect: answer.is_correct,
-        reviewDate: answer.review_date,
+        reviewDate: answer.review_date || "",
         seconds
       });
       setPlan((current) => current ? {
