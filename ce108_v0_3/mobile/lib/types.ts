@@ -33,7 +33,7 @@ export type DailyPlanItem = {
 export type DailyPlan = {
   id: number;
   plan_date: string;
-  mode?: "medical" | "engineering" | "balanced";
+  mode?: StudyMode;
   mode_label?: string;
   recommended_count: number;
   estimated_minutes: number;
@@ -67,7 +67,7 @@ export type AnswerPayload = {
   numeric_answer: number | null;
   confidence: string;
   response_time_seconds: number;
-  answer_mode: "daily";
+  answer_mode: string;
 };
 
 export type VisualAid = {
@@ -111,6 +111,7 @@ export type AnswerResult = {
       label: string;
     };
     visual_aid?: VisualAid;
+    is_bookmarked?: boolean;
   };
   related_questions?: Array<{
     id: number;
@@ -215,7 +216,7 @@ export type FeedbackPayload = {
   user_agent?: string;
 };
 
-export type StudyMode = "medical" | "engineering" | "balanced";
+export type StudyMode = "medical" | "engineering" | "balanced" | "wrong" | "frequent" | "bookmarked";
 
 export type RadarSubject = {
   subject_code: string;
@@ -260,6 +261,44 @@ export type StudyStrategy = {
   weak_subjects: RadarSubject[];
   strong_subjects: RadarSubject[];
   weak_topics: MasteryRow[];
+};
+
+export type BookmarkListItem = {
+  bookmark_id: number;
+  created_at: string;
+  note?: string | null;
+  question_id: number;
+  question_text: string;
+  question_type: QuestionType;
+  importance: number;
+  subject_name?: string | null;
+  topic_name?: string | null;
+  answered: number;
+};
+
+export type BookmarkList = {
+  items: BookmarkListItem[];
+  total: number;
+};
+
+export type FrequentTopic = {
+  topic_id: number;
+  topic_code: string;
+  topic_name: string;
+  subject_name: string;
+  question_count: number;
+  avg_importance: number;
+  avg_frequency: number;
+  mastery_score: number;
+  total_answers: number;
+  correct_answers: number;
+  accuracy?: number | null;
+  recommended_reason: string;
+};
+
+export type FrequentTopicList = {
+  items: FrequentTopic[];
+  total: number;
 };
 
 export type StudentNote = {

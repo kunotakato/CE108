@@ -65,6 +65,10 @@ export default function ReviewsPage() {
         <h1>今日の復習を片づけましょう。</h1>
         <p className="lead">今日までの復習 {queue?.due_count ?? 0} 件、今後の予定 {queue?.upcoming_count ?? 0} 件。</p>
         <Link className="primary-button" href="/study">今日の5問へ進む</Link>
+        <div className="mode-grid">
+          <Link className="secondary-button" href="/study?mode=wrong">間違えた問題だけ解く</Link>
+          <Link className="secondary-button" href="/study?mode=bookmarked">ブックマークを解く</Link>
+        </div>
       </section>
       {loading ? <LoadingState /> : null}
       {error ? <ErrorState message={error} onRetry={load} /> : null}

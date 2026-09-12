@@ -4,9 +4,9 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { ErrorState, LoadingState } from "@/components/StateViews";
-import { addExamEvent, addScoreRecord, getStrategy, saveTargetExamDate } from "@/lib/api";
+import { addExamEvent, addScoreRecord, getFrequentTopics, getStrategy, saveTargetExamDate } from "@/lib/api";
 import { getToken } from "@/lib/auth";
-import type { RadarSubject, ScoreRecordPayload, StudyMode, StudyStrategy } from "@/lib/types";
+import type { FrequentTopic, RadarSubject, ScoreRecordPayload, StudyMode, StudyStrategy } from "@/lib/types";
 
 const subjectNames = [
   "医学概論・基礎医学",
@@ -56,6 +56,7 @@ function RadarChart({ rows }: { rows: RadarSubject[] }) {
 
 export default function StrategyPage() {
   const [strategy, setStrategy] = useState<StudyStrategy | null>(null);
+  const [frequentTopics, setFrequentTopics] = useState<FrequentTopic[]>([]);
   const [targetDate, setTargetDate] = useState("");
   const [eventTitle, setEventTitle] = useState("次回模試");
   const [eventDate, setEventDate] = useState("");
@@ -77,8 +78,9 @@ export default function StrategyPage() {
     setLoading(true);
     setError("");
     try {
-      const next = await getStrategy(token);
+      const [next, topics] = await Promise.all([getStrategy(token), getFrequentTopics(token, 5)]);
       setStrategy(next);
+      setFrequentTopics(topics.items);
       setTargetDate(next.target_exam_date || "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "戦略データを読み込めませんでした。");
@@ -150,7 +152,14 @@ export default function StrategyPage() {
   if (loading) return <AppShell title="戦略"><LoadingState /></AppShell>;
 
   const mode = (strategy?.recommended_mode || "balanced") as StudyMode;
-  const modeLabels: Record<StudyMode, string> = { medical: "医学重点", engineering: "工学重点", balanced: "バランス" };
+  const modeLabels: Record<StudyMode, string> = {
+    medical: "医学重点",
+    engineering: "工学重点",
+    balanced: "バランス",
+    wrong: "誤答だけ",
+    frequent: "頻出テーマ",
+    bookmarked: "ブックマーク"
+  };
 
   return (
     <AppShell title="戦略">
@@ -174,7 +183,23 @@ export default function StrategyPage() {
           <Link className="secondary-button" href="/study?mode=medical">医学重点</Link>
           <Link className="secondary-button" href="/study?mode=engineering">工学重点</Link>
           <Link className="secondary-button" href="/study?mode=balanced">バランス</Link>
+          <Link className="secondary-button" href="/study?mode=wrong">誤答だけ</Link>
+          <Link className="secondary-button" href="/study?mode=frequent">頻出テーマ</Link>
+          <Link className="secondary-button" href="/study?mode=bookmarked">ブックマーク</Link>
         </div>
+      </section>
+      <section className="panel stack">
+        <h2>頻出テーマ</h2>
+        {frequentTopics.length ? frequentTopics.map((topic) => (
+          <div className="topic-row" key={topic.topic_id}>
+            <div>
+              <strong>{topic.topic_name}</strong>
+              <p className="muted">{topic.subject_name} / 問題 {topic.question_count} 問 / 頻出 {topic.avg_frequency}</p>
+            </div>
+            <span className="pill">{topic.mastery_score}%</span>
+          </div>
+        )) : <p className="muted">頻出テーマを集計中です。</p>}
+        <Link className="secondary-button" href="/study?mode=frequent">頻出テーマ5問を解く</Link>
       </section>
       <form className="panel form" onSubmit={submitTarget}>
         <h2>試験日</h2>

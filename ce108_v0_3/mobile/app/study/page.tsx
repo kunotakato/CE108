@@ -10,7 +10,7 @@ import { ConfidenceSelector } from "@/components/ConfidenceSelector";
 import { ProgressHeader } from "@/components/ProgressHeader";
 import { EmptyState, ErrorState, LoadingState } from "@/components/StateViews";
 import { VisualAidCard } from "@/components/VisualAid";
-import { getFocusPlan, getQuestion, getToday, submitAnswer } from "@/lib/api";
+import { getFocusPlan, getQuestion, getToday, setBookmark, submitAnswer } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { addSessionAnswer, ensureSession, getSession } from "@/lib/studySession";
 import type { AnswerResult, DailyPlan, DailyPlanItem, Question, StudyMode } from "@/lib/types";
@@ -23,6 +23,15 @@ function StudyPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = (searchParams.get("mode") || "daily") as StudyMode | "daily";
+  const modeLabels: Record<StudyMode | "daily", string> = {
+    daily: "今日の5問",
+    medical: "医学重点",
+    engineering: "工学重点",
+    balanced: "バランス",
+    wrong: "誤答だけ",
+    frequent: "頻出テーマ",
+    bookmarked: "ブックマーク"
+  };
   const startedAt = useRef(Date.now());
   const [plan, setPlan] = useState<DailyPlan | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -132,7 +141,7 @@ function StudyPageContent() {
         numeric_answer: numericValue,
         confidence,
         response_time_seconds: seconds,
-        answer_mode: "daily"
+        answer_mode: mode === "daily" ? "daily" : mode
       });
       setResult(answer);
       addSessionAnswer(sessionKey, {
@@ -151,6 +160,22 @@ function StudyPageContent() {
       setError(err instanceof Error ? err.message : "回答を保存できませんでした。");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleBookmark(bookmarked: boolean) {
+    if (!result?.question) return;
+    const token = getToken();
+    if (!token) return;
+    setError("");
+    try {
+      await setBookmark(token, result.question.id, bookmarked);
+      setResult((current) => current ? {
+        ...current,
+        question: { ...current.question, is_bookmarked: bookmarked }
+      } : current);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ブックマークを更新できませんでした。");
     }
   }
 
@@ -174,7 +199,7 @@ function StudyPageContent() {
 
   if (loading && !question) {
     return (
-      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false} bottomAction>
+      <AppShell title={modeLabels[mode] || "重点5問"} nav={false} bottomAction>
         <LoadingState />
       </AppShell>
     );
@@ -182,7 +207,7 @@ function StudyPageContent() {
 
   if (error && !question) {
     return (
-      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false} bottomAction>
+      <AppShell title={modeLabels[mode] || "重点5問"} nav={false} bottomAction>
         <ErrorState message={error} onRetry={item ? () => loadQuestion(item.question_id) : loadPlan} />
         <Link className="link-button" href="/home">ホームへ戻る</Link>
       </AppShell>
@@ -191,7 +216,7 @@ function StudyPageContent() {
 
   if (allCompleted && !result) {
     return (
-      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false} bottomAction>
+      <AppShell title={modeLabels[mode] || "重点5問"} nav={false} bottomAction>
         <EmptyState message="今日の5問は完了しています。" />
         <BottomAction onClick={() => router.push("/result")}>結果を見る</BottomAction>
       </AppShell>
@@ -200,7 +225,7 @@ function StudyPageContent() {
 
   if (!item || !question) {
     return (
-      <AppShell title={mode === "daily" ? "今日の5問" : "重点5問"} nav={false} bottomAction>
+      <AppShell title={modeLabels[mode] || "重点5問"} nav={false} bottomAction>
         <EmptyState message="今日の問題がありません。" />
         <BottomAction onClick={() => router.push("/home")}>ホームへ戻る</BottomAction>
       </AppShell>
@@ -251,6 +276,13 @@ function StudyPageContent() {
               <span className="pill">{result.question.answer_statistics?.label || "回答を保存しました"}</span>
             </div>
             <h2 className={result.is_correct ? "correct" : "incorrect"}>{result.is_correct ? "正解です" : "復習しましょう"}</h2>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => handleBookmark(!result.question.is_bookmarked)}
+            >
+              {result.question.is_bookmarked ? "ブックマーク解除" : "ブックマークする"}
+            </button>
             {result.question.learning_point ? (
               <div className="pill-row">
                 <span className="pill">学習ポイント</span>

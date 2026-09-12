@@ -30,6 +30,7 @@ from ce108.services import (
     get_beta_feedback_summary,
     get_beta_tester_activity,
     get_daily_status,
+    get_frequent_topics,
     get_learning_history,
     get_question,
     get_learning_summary,
@@ -42,6 +43,7 @@ from ce108.services import (
     get_study_strategy,
     list_assignment_results,
     list_note_questions,
+    list_bookmarked_questions,
     list_questions,
     list_students_for_teacher,
     list_student_notes,
@@ -51,6 +53,7 @@ from ce108.services import (
     add_exam_event,
     add_score_record,
     save_beta_feedback,
+    set_question_bookmark,
     set_target_exam_date,
     start_diagnostic,
 )
@@ -146,6 +149,10 @@ class BetaStudentRequest(BaseModel):
     school_name: str = 'CE108外部β'
     target_exam_year: int | None = None
 
+class BookmarkRequest(BaseModel):
+    bookmarked: bool = True
+    note: str = ''
+
 def current_user(token: Annotated[str, Depends(oauth)]):
     try:
         payload = decode_access_token(token)
@@ -209,6 +216,18 @@ def today(count: int = 5, user=Depends(require_role('student'))):
 @app.get('/api/study/focus')
 def study_focus(mode: str = 'balanced', count: int = 5, user=Depends(require_role('student'))):
     return get_focus_plan(user['id'], mode=mode, count=count)
+
+@app.get('/api/study/frequent-topics')
+def study_frequent_topics(limit: int = 10, user=Depends(require_role('student'))):
+    return get_frequent_topics(user['id'], limit=limit)
+
+@app.get('/api/study/bookmarks')
+def study_bookmarks(limit: int = 50, user=Depends(require_role('student'))):
+    return list_bookmarked_questions(user['id'], limit=limit)
+
+@app.post('/api/questions/{qid}/bookmark')
+def question_bookmark(qid: int, req: BookmarkRequest, user=Depends(require_role('student'))):
+    return set_question_bookmark(user['id'], qid, req.bookmarked, req.note)
 
 @app.get('/api/study/daily-status')
 def daily_status(count: int = 5, user=Depends(require_role('student'))):

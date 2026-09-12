@@ -116,6 +116,15 @@ export default function HomePage() {
         <Link className="secondary-button" href="/history">学習履歴を見る</Link>
       </section>
       <section className="panel stack">
+        <h2>目的別に解く</h2>
+        <div className="mode-grid">
+          <Link className="secondary-button" href="/study?mode=wrong">間違えた問題だけ</Link>
+          <Link className="secondary-button" href="/study?mode=frequent">頻出テーマ</Link>
+          <Link className="secondary-button" href="/study?mode=bookmarked">ブックマーク</Link>
+        </div>
+        <p className="muted">通常期は苦手を潰し、直前期は頻出・得意分野を伸ばす使い方を想定しています。</p>
+      </section>
+      <section className="panel stack">
         <h2>ノートから問題作成</h2>
         <p className="muted">授業メモや模試復習メモから、CE108が重要点を拾ってオリジナル問題を作ります。</p>
         <Link className="secondary-button" href="/notes">ノートAIを使う</Link>

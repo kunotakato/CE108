@@ -115,6 +115,10 @@
 
 国試風オリジナル問題の作成ルールは`docs/QUESTION_AUTHORING_GUIDE.md`を参照してください。
 
+競合アプリから取り入れるべき学習体験、課金価値、優先ロードマップは`docs/COMPETITIVE_MODELING.md`を参照してください。
+
+月額1,480円を前提にした無料/有料の境界設計は`docs/MONETIZATION_BOUNDARY.md`を参照してください。
+
 ## 起動方法
 
 Python 3.11または3.12を推奨します。v0.3内部α版はPython 3.12.13で検証済みです。

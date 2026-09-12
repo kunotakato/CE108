@@ -894,6 +894,20 @@ h3 {
   grid-template-columns: 1fr;
 }
 
+.topic-row {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.topic-row > div {
+  min-width: 0;
+}
+
 .radar-chart {
   aspect-ratio: 1;
   display: block;

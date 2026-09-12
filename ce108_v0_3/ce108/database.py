@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS assignment_targets(id INTEGER PRIMARY KEY AUTOINCREME
 CREATE TABLE IF NOT EXISTS tester_requests(id INTEGER PRIMARY KEY AUTOINCREMENT,line_user_id TEXT,message TEXT,requested_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS beta_feedback(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),category TEXT NOT NULL,message TEXT NOT NULL,page_url TEXT,user_agent TEXT,created_at TEXT NOT NULL,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS login_events(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,role TEXT NOT NULL,email TEXT NOT NULL,logged_in_at TEXT NOT NULL,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS user_question_bookmarks(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,question_id INTEGER NOT NULL,note TEXT,created_at TEXT NOT NULL,UNIQUE(user_id,question_id),FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,FOREIGN KEY(question_id) REFERENCES questions(id) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS audit_logs(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,action TEXT NOT NULL,target_type TEXT NOT NULL,target_id TEXT,before_data TEXT,after_data TEXT,created_at TEXT NOT NULL,FOREIGN KEY(user_id) REFERENCES users(id));
 CREATE INDEX IF NOT EXISTS idx_answers_user_date ON answer_history(user_id,answered_at);
 CREATE INDEX IF NOT EXISTS idx_review_user_date ON review_schedules(user_id,scheduled_date,status);
@@ -59,6 +60,7 @@ CREATE INDEX IF NOT EXISTS idx_score_records_user_date ON score_records(user_id,
 CREATE INDEX IF NOT EXISTS idx_student_notes_user ON student_notes(user_id,created_at);
 CREATE INDEX IF NOT EXISTS idx_note_questions_user ON note_generated_questions(user_id,note_id);
 CREATE INDEX IF NOT EXISTS idx_login_events_user_date ON login_events(user_id,logged_in_at);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_user ON user_question_bookmarks(user_id,created_at);
 '''
 
 def initialize_database(db_path: Path | str = DB_PATH) -> None:

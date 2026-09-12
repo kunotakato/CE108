@@ -25,6 +25,7 @@ from ce108.services import (
     get_beta_feedback_summary,
     get_beta_tester_activity,
     get_daily_status,
+    get_frequent_topics,
     get_learning_history,
     get_diagnostic_state,
     get_mastery_report,
@@ -34,6 +35,8 @@ from ce108.services import (
     get_student_summary_for_teacher,
     get_teacher_support_summary,
     get_study_strategy,
+    is_question_bookmarked,
+    list_bookmarked_questions,
     create_student_note,
     extract_note_upload_text,
     generate_note_questions,
@@ -42,6 +45,7 @@ from ce108.services import (
     add_exam_event,
     add_score_record,
     save_beta_feedback,
+    set_question_bookmark,
     record_login_event,
     schedule_review,
     set_target_exam_date,
@@ -249,6 +253,34 @@ class TestCore(unittest.TestCase):
         self.assertTrue(all(item['subject_name'] in {'医学概論・基礎医学', '臨床医学総論'} for item in medical['items']))
         self.assertEqual(engineering['mode'], 'engineering')
         self.assertTrue(engineering['items'])
+
+    def test_bookmark_lifecycle_and_plan(self):
+        q = get_question(1, self.db)
+        self.assertFalse(is_question_bookmarked(self.student['id'], q['id'], self.db))
+        saved = set_question_bookmark(self.student['id'], q['id'], True, db_path=self.db)
+        self.assertTrue(saved['bookmarked'])
+        self.assertTrue(is_question_bookmarked(self.student['id'], q['id'], self.db))
+        bookmarks = list_bookmarked_questions(self.student['id'], 10, self.db)
+        self.assertEqual(bookmarks['total'], 1)
+        plan = get_focus_plan(self.student['id'], 'bookmarked', 5, self.db)
+        self.assertEqual(plan['mode'], 'bookmarked')
+        self.assertEqual(plan['items'][0]['question_id'], q['id'])
+        removed = set_question_bookmark(self.student['id'], q['id'], False, db_path=self.db)
+        self.assertFalse(removed['bookmarked'])
+
+    def test_wrong_and_frequent_focus_plans(self):
+        q = get_question(1, self.db)
+        wrong = next(c['choice_code'] for c in q['choices'] if c['choice_code'] not in q['correct_codes'])
+        record_answer(self.student['id'], q['id'], [wrong], None, '迷った', 30, 'daily', db_path=self.db)
+        wrong_plan = get_focus_plan(self.student['id'], 'wrong', 5, self.db)
+        self.assertEqual(wrong_plan['mode'], 'wrong')
+        self.assertTrue(any(item['question_id'] == q['id'] for item in wrong_plan['items']))
+        frequent = get_focus_plan(self.student['id'], 'frequent', 5, self.db)
+        topics = get_frequent_topics(self.student['id'], 5, self.db)
+        self.assertEqual(frequent['mode'], 'frequent')
+        self.assertTrue(frequent['items'])
+        self.assertTrue(topics['items'])
+        self.assertIn('recommended_reason', topics['items'][0])
 
     def test_exam_strategy_records_scores_and_events(self):
         set_target_exam_date(self.student['id'], (date.today() + timedelta(days=120)).isoformat(), self.db)
@@ -458,6 +490,28 @@ class TestApi(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         res = self.client.post('/api/study/scores', headers={'Authorization': f'Bearer {token}'}, json={'score_type': 'mock', 'title': '公開模試', 'taken_at': date.today().isoformat(), 'total_score': 110, 'max_score': 180, 'subject_scores': {'医学概論・基礎医学': 62}})
         self.assertEqual(res.status_code, 200)
+
+    def test_bookmark_wrong_and_frequent_api(self):
+        token = self._token()
+        headers = {'Authorization': f'Bearer {token}'}
+        marked = self.client.post('/api/questions/2/bookmark', headers=headers, json={'bookmarked': True})
+        self.assertEqual(marked.status_code, 200, marked.text)
+        self.assertTrue(marked.json()['bookmarked'])
+        bookmarks = self.client.get('/api/study/bookmarks', headers=headers)
+        self.assertEqual(bookmarks.status_code, 200, bookmarks.text)
+        self.assertGreaterEqual(bookmarks.json()['total'], 1)
+        bookmarked_plan = self.client.get('/api/study/focus?mode=bookmarked&count=5', headers=headers)
+        self.assertEqual(bookmarked_plan.status_code, 200, bookmarked_plan.text)
+        self.assertEqual(bookmarked_plan.json()['mode'], 'bookmarked')
+        self.client.post('/api/questions/2/answer', headers=headers, json={'selected_codes': ['999'], 'numeric_answer': None, 'confidence': '迷った', 'response_time_seconds': 20, 'answer_mode': 'daily'})
+        wrong_plan = self.client.get('/api/study/focus?mode=wrong&count=5', headers=headers)
+        self.assertEqual(wrong_plan.status_code, 200, wrong_plan.text)
+        self.assertEqual(wrong_plan.json()['mode'], 'wrong')
+        frequent = self.client.get('/api/study/frequent-topics', headers=headers)
+        self.assertEqual(frequent.status_code, 200, frequent.text)
+        self.assertTrue(frequent.json()['items'])
+        unmarked = self.client.post('/api/questions/2/bookmark', headers=headers, json={'bookmarked': False})
+        self.assertFalse(unmarked.json()['bookmarked'])
 
     def test_review_queue_api(self):
         token = self._token()

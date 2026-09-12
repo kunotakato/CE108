@@ -1,9 +1,11 @@
 import type {
   AnswerPayload,
   AnswerResult,
+  BookmarkList,
   DailyStatus,
   FeedbackPayload,
   DailyPlan,
+  FrequentTopicList,
   LearningHistory,
   LearningSummary,
   LoginResponse,
@@ -87,6 +89,14 @@ export async function getDailyStatus(token: string, count = 5) {
 
 export async function getReviewQueue(token: string, limit = 20) {
   return apiFetch<ReviewQueue>(`/api/study/reviews?limit=${limit}`, { token });
+}
+
+export async function getBookmarks(token: string, limit = 50) {
+  return apiFetch<BookmarkList>(`/api/study/bookmarks?limit=${limit}`, { token });
+}
+
+export async function getFrequentTopics(token: string, limit = 10) {
+  return apiFetch<FrequentTopicList>(`/api/study/frequent-topics?limit=${limit}`, { token });
 }
 
 export async function getHistory(token: string, limit = 50) {
@@ -201,6 +211,14 @@ export async function submitAnswer(token: string, questionId: number, payload: A
     token,
     method: "POST",
     body: payload
+  });
+}
+
+export async function setBookmark(token: string, questionId: number, bookmarked: boolean, note = "") {
+  return apiFetch<{ question_id: number; bookmarked: boolean }>(`/api/questions/${questionId}/bookmark`, {
+    token,
+    method: "POST",
+    body: { bookmarked, note }
   });
 }
 

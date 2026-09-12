@@ -12,6 +12,9 @@ FOCUS_MODES={
     'medical': {'label':'医学重点','subjects':{'MED','CLIN'},'reason':'医学・臨床医学を8割へ近づけるために選びました。'},
     'engineering': {'label':'工学重点','subjects':{'EEE','MECH','MAT','SUP','THER','MEAS','SAFE'},'reason':'工学・装置・安全分野を固めるために選びました。'},
     'balanced': {'label':'バランス','subjects':set(),'reason':'全分野をバランスよく回すために選びました。'},
+    'wrong': {'label':'誤答だけ','subjects':set(),'reason':'過去に間違えた問題だけを集めました。'},
+    'frequent': {'label':'頻出テーマ','subjects':set(),'reason':'重要度と頻出度が高いテーマを優先しました。'},
+    'bookmarked': {'label':'ブックマーク','subjects':set(),'reason':'自分で残した問題だけを復習します。'},
 }
 NOTE_TOPIC_KEYWORDS=[
     ('SUP-RESP',{'呼吸','換気','肺胞','酸素','co2','二酸化炭素','peep','fio2','人工呼吸'}),
@@ -115,6 +118,59 @@ def related_questions(user_id:int,question_id:int,limit:int=3,db_path:Path|str=D
         WHERE m.topic_id=? AND q.id<>? AND q.status='published'
         ORDER BY answered ASC,q.importance DESC,q.id LIMIT ?''',(user_id,topic['topic_id'],question_id,max(1,min(limit,10))),db_path)
     return [dict(r) for r in rows]
+
+def is_question_bookmarked(user_id:int,question_id:int,db_path:Path|str=DB_PATH)->bool:
+    row=fetch_one('SELECT 1 FROM user_question_bookmarks WHERE user_id=? AND question_id=?',(user_id,question_id),db_path)
+    return bool(row)
+
+def set_question_bookmark(user_id:int,question_id:int,bookmarked:bool=True,note:str='',db_path:Path|str=DB_PATH):
+    q=get_question(question_id,db_path)
+    if not q or q['status']!='published':raise ValueError('公開中の問題が見つかりません。')
+    if bookmarked:
+        with connect(db_path) as conn:
+            conn.execute('INSERT INTO user_question_bookmarks(user_id,question_id,note,created_at) VALUES(?,?,?,?) ON CONFLICT(user_id,question_id) DO UPDATE SET note=excluded.note',(user_id,question_id,note.strip() or None,utc_now()))
+        return {'question_id':question_id,'bookmarked':True}
+    execute('DELETE FROM user_question_bookmarks WHERE user_id=? AND question_id=?',(user_id,question_id),db_path)
+    return {'question_id':question_id,'bookmarked':False}
+
+def list_bookmarked_questions(user_id:int,limit:int=50,db_path:Path|str=DB_PATH):
+    rows=fetch_all('''SELECT b.id bookmark_id,b.created_at,b.note,q.id question_id,q.question_text,q.question_type,q.importance,s.name subject_name,t.name topic_name,
+        EXISTS(SELECT 1 FROM answer_history a WHERE a.user_id=b.user_id AND a.question_id=q.id) answered
+        FROM user_question_bookmarks b
+        JOIN questions q ON q.id=b.question_id
+        LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary'
+        LEFT JOIN topics t ON t.id=m.topic_id
+        LEFT JOIN subjects s ON s.id=t.subject_id
+        WHERE b.user_id=? AND q.status='published'
+        ORDER BY b.created_at DESC,b.id DESC
+        LIMIT ?''',(user_id,max(1,min(int(limit or 50),200))),db_path)
+    return {'items':[dict(r) for r in rows],'total':len(rows)}
+
+def get_frequent_topics(user_id:int,limit:int=10,db_path:Path|str=DB_PATH):
+    rows=fetch_all('''SELECT t.id topic_id,t.code topic_code,t.name topic_name,s.name subject_name,
+        COUNT(q.id) question_count,
+        ROUND(AVG(q.importance),2) avg_importance,
+        ROUND(AVG(q.frequency_score),2) avg_frequency,
+        COALESCE(m.mastery_score,0) mastery_score,
+        COALESCE(m.total_answers,0) total_answers,
+        COALESCE(m.correct_answers,0) correct_answers
+        FROM topics t
+        JOIN subjects s ON s.id=t.subject_id
+        JOIN question_topic_mappings qm ON qm.topic_id=t.id AND qm.mapping_type='primary'
+        JOIN questions q ON q.id=qm.question_id AND q.status='published'
+        LEFT JOIN user_topic_mastery m ON m.topic_id=t.id AND m.user_id=?
+        GROUP BY t.id
+        ORDER BY (AVG(q.importance)*0.45 + AVG(q.frequency_score)*0.35 + (1-COALESCE(m.mastery_score,0)/100.0)*2.0) DESC,t.display_order
+        LIMIT ?''',(user_id,max(1,min(int(limit or 10),50))),db_path)
+    items=[]
+    for r in rows:
+        d=dict(r)
+        total=int(d['total_answers'] or 0)
+        correct=int(d['correct_answers'] or 0)
+        d['accuracy']=round(correct/total*100,1) if total else None
+        d['recommended_reason']='頻出度・重要度が高く、理解度の底上げに向いています。'
+        items.append(d)
+    return {'items':items,'total':len(items)}
 
 def _choice_feedback(q:dict,selected_codes:list[str]|None):
     selected=set(selected_codes or [])
@@ -264,6 +320,7 @@ def record_answer(user_id:int,question_id:int,selected_codes:list[str]|None,nume
     q['learning_point']=_question_learning_point(q)
     q['answer_statistics']=_answer_statistics(question_id,db_path)
     q['visual_aid']=_question_visual_aid(q)
+    q['is_bookmarked']=is_question_bookmarked(user_id,question_id,db_path)
     return {'is_correct':correct,'review_date':review,'question':q,'related_questions':related_questions(user_id,question_id,db_path=db_path)}
 
 def _parse_selected_codes(value:str|None)->list[str]:
@@ -285,6 +342,7 @@ def get_answered_question_detail(user_id:int,question_id:int,db_path:Path|str=DB
     q['learning_point']=_question_learning_point(q)
     q['answer_statistics']=_answer_statistics(question_id,db_path)
     q['visual_aid']=_question_visual_aid(q)
+    q['is_bookmarked']=is_question_bookmarked(user_id,question_id,db_path)
     return {
         'is_correct':bool(latest['is_correct']),
         'review_date':review['scheduled_date'] if review else None,
@@ -366,6 +424,12 @@ def get_focus_plan(user_id:int,mode:str='balanced',count:int=5,db_path:Path|str=
     if cfg['subjects']:
         marks=','.join('?' for _ in cfg['subjects'])
         where+=f" AND s.code IN ({marks})";params.extend(sorted(cfg['subjects']))
+    if mode=='wrong':
+        where+=" AND EXISTS(SELECT 1 FROM answer_history aw WHERE aw.user_id=? AND aw.question_id=q.id AND aw.is_correct=0)"
+        params.append(user_id)
+    elif mode=='bookmarked':
+        where+=" AND EXISTS(SELECT 1 FROM user_question_bookmarks b WHERE b.user_id=? AND b.question_id=q.id)"
+        params.append(user_id)
     rows=[dict(r) for r in fetch_all(f'''SELECT q.id question_id,q.question_text,q.question_type,q.importance,q.frequency_score,s.name subject_name,s.code subject_code,t.name topic_name,COALESCE(m.mastery_score,0) mastery,EXISTS(SELECT 1 FROM answer_history a WHERE a.user_id=? AND a.question_id=q.id) answered FROM questions q JOIN question_topic_mappings tm ON tm.question_id=q.id AND tm.mapping_type='primary' JOIN topics t ON t.id=tm.topic_id JOIN subjects s ON s.id=t.subject_id LEFT JOIN user_topic_mastery m ON m.topic_id=t.id AND m.user_id=? {where} GROUP BY q.id ORDER BY answered ASC,((q.importance/5.0)*0.45 + MIN(1,q.frequency_score/3.0)*0.25 + (1-COALESCE(m.mastery_score,0)/100.0)*0.30) DESC,q.id LIMIT ?''',[user_id,*params,count],db_path)]
     items=[]
     for i,r in enumerate(rows,1):
