@@ -19,6 +19,7 @@ import type {
   StudyStrategy,
   StudentNote
 } from "./types";
+import { clearAuth } from "./auth";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
@@ -48,6 +49,14 @@ async function parseError(response: Response) {
   }
 }
 
+function handleUnauthorized(response: Response, hadToken: boolean) {
+  if (response.status === 401 && hadToken) {
+    clearAuth();
+    return "ログイン期限が切れています。ログイン画面から入り直してください。";
+  }
+  return null;
+}
+
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const headers = new Headers();
   if (options.token) headers.set("Authorization", `Bearer ${options.token}`);
@@ -65,6 +74,8 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     body
   });
   if (!response.ok) {
+    const authMessage = handleUnauthorized(response, Boolean(options.token));
+    if (authMessage) throw new ApiError(authMessage, response.status);
     throw new ApiError(await parseError(response), response.status);
   }
   return response.json() as Promise<T>;
@@ -166,6 +177,8 @@ export async function extractNoteText(token: string, file: File) {
     body: form
   });
   if (!response.ok) {
+    const authMessage = handleUnauthorized(response, true);
+    if (authMessage) throw new ApiError(authMessage, response.status);
     throw new ApiError(await parseError(response), response.status);
   }
   return response.json() as Promise<NoteExtractResult>;

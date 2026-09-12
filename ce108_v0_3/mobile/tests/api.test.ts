@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { assertQuestionSafe, extractNoteText, getQuestion, login, submitFeedback } from "@/lib/api";
+import { getToken, saveAuth } from "@/lib/auth";
 
 describe("api client", () => {
   it("posts demo login as form data", async () => {
@@ -43,6 +44,22 @@ describe("api client", () => {
     );
 
     await expect(getQuestion("token", 1)).rejects.toThrow("選択肢の解説情報");
+    vi.unstubAllGlobals();
+  });
+
+  it("clears stale auth token on authenticated 401", async () => {
+    saveAuth("stale-token", { id: 1, email: "student@example.com", role: "student", display_name: "学生" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: async () => JSON.stringify({ detail: "無効な認証です。" })
+      })
+    );
+
+    await expect(getQuestion("stale-token", 1)).rejects.toThrow("ログイン期限");
+    expect(getToken()).toBeNull();
     vi.unstubAllGlobals();
   });
 
