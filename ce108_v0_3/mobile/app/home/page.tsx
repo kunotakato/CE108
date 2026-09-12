@@ -121,6 +121,7 @@ export default function HomePage() {
           <Link className="secondary-button" href="/study?mode=wrong">間違えた問題だけ</Link>
           <Link className="secondary-button" href="/study?mode=frequent">頻出テーマ</Link>
           <Link className="secondary-button" href="/study?mode=bookmarked">ブックマーク</Link>
+          <Link className="secondary-button" href="/study?mode=first_paid">有料候補30問</Link>
         </div>
         <p className="muted">通常期は苦手を潰し、直前期は頻出・得意分野を伸ばす使い方を想定しています。</p>
       </section>

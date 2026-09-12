@@ -6,6 +6,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 from .config import DB_PATH, NOTE_OCR_MAX_BYTES, NOTE_OCR_PROVIDER
 from .database import connect, execute, fetch_all, fetch_one, utc_now
+from .first_paid_pack import FIRST_PAID_TESTER_PACK_POLICY, FIRST_PAID_TESTER_PACK_TEXTS
 
 CONFIDENCE_VALUES={'確実に分かる':1.0,'たぶん分かる':0.82,'迷った':0.58,'勘で答えた':0.35}
 FOCUS_MODES={
@@ -15,6 +16,7 @@ FOCUS_MODES={
     'wrong': {'label':'誤答だけ','subjects':set(),'reason':'過去に間違えた問題だけを集めました。'},
     'frequent': {'label':'頻出テーマ','subjects':set(),'reason':'重要度と頻出度が高いテーマを優先しました。'},
     'bookmarked': {'label':'ブックマーク','subjects':set(),'reason':'自分で残した問題だけを復習します。'},
+    'first_paid': {'label':'有料候補30問','subjects':set(),'reason':'最初の有料候補へ見せるために選んだ30問です。'},
 }
 NOTE_TOPIC_KEYWORDS=[
     ('SUP-RESP',{'呼吸','換気','肺胞','酸素','co2','二酸化炭素','peep','fio2','人工呼吸'}),
@@ -171,6 +173,10 @@ def get_frequent_topics(user_id:int,limit:int=10,db_path:Path|str=DB_PATH):
         d['recommended_reason']='頻出度・重要度が高く、理解度の底上げに向いています。'
         items.append(d)
     return {'items':items,'total':len(items)}
+
+def get_first_paid_tester_pack(user_id:int,db_path:Path|str=DB_PATH):
+    plan=get_focus_plan(user_id,'first_paid',30,db_path)
+    return {**FIRST_PAID_TESTER_PACK_POLICY,'items':plan['items'],'available_questions':len(plan['items'])}
 
 def _choice_feedback(q:dict,selected_codes:list[str]|None):
     selected=set(selected_codes or [])
@@ -418,7 +424,7 @@ def get_daily_plan(user_id:int,plan_date:str|None=None,db_path:Path|str=DB_PATH)
     d=dict(p);d['items']=[{**dict(r),'completed':r['question_id'] in answered} for r in items];return d
 
 def get_focus_plan(user_id:int,mode:str='balanced',count:int=5,db_path:Path|str=DB_PATH):
-    mode=mode if mode in FOCUS_MODES else 'balanced';cfg=FOCUS_MODES[mode];count=max(3,min(10,int(count or 5)))
+    mode=mode if mode in FOCUS_MODES else 'balanced';cfg=FOCUS_MODES[mode];count=max(3,min(30 if mode=='first_paid' else 10,int(count or 5)))
     params=[user_id]
     where="WHERE q.status='published'"
     if cfg['subjects']:
@@ -430,6 +436,10 @@ def get_focus_plan(user_id:int,mode:str='balanced',count:int=5,db_path:Path|str=
     elif mode=='bookmarked':
         where+=" AND EXISTS(SELECT 1 FROM user_question_bookmarks b WHERE b.user_id=? AND b.question_id=q.id)"
         params.append(user_id)
+    elif mode=='first_paid':
+        marks=','.join('?' for _ in FIRST_PAID_TESTER_PACK_TEXTS)
+        where+=f" AND q.question_text IN ({marks})"
+        params.extend(FIRST_PAID_TESTER_PACK_TEXTS)
     rows=[dict(r) for r in fetch_all(f'''SELECT q.id question_id,q.question_text,q.question_type,q.importance,q.frequency_score,s.name subject_name,s.code subject_code,t.name topic_name,COALESCE(m.mastery_score,0) mastery,EXISTS(SELECT 1 FROM answer_history a WHERE a.user_id=? AND a.question_id=q.id) answered FROM questions q JOIN question_topic_mappings tm ON tm.question_id=q.id AND tm.mapping_type='primary' JOIN topics t ON t.id=tm.topic_id JOIN subjects s ON s.id=t.subject_id LEFT JOIN user_topic_mastery m ON m.topic_id=t.id AND m.user_id=? {where} GROUP BY q.id ORDER BY answered ASC,((q.importance/5.0)*0.45 + MIN(1,q.frequency_score/3.0)*0.25 + (1-COALESCE(m.mastery_score,0)/100.0)*0.30) DESC,q.id LIMIT ?''',[user_id,*params,count],db_path)]
     items=[]
     for i,r in enumerate(rows,1):

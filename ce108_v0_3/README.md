@@ -119,6 +119,8 @@
 
 月額1,480円を前提にした無料/有料の境界設計は`docs/MONETIZATION_BOUNDARY.md`を参照してください。
 
+最初の有料候補テスターへ渡す30問パックは`docs/FIRST_PAID_TESTER_PACK.md`を参照してください。
+
 ## 起動方法
 
 Python 3.11または3.12を推奨します。v0.3内部α版はPython 3.12.13で検証済みです。

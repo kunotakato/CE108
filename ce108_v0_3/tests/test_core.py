@@ -13,6 +13,7 @@ from ce108.database import connect, fetch_all, fetch_one
 from ce108.security import hash_password
 from ce108.seed import seed_database
 from scripts.export_question_review_csv import export_review_csv
+from scripts.export_first_paid_tester_pack import export_first_paid_pack
 from ce108.services import (
     answer_diagnostic,
     authenticate_user,
@@ -20,6 +21,7 @@ from ce108.services import (
     create_beta_student,
     generate_daily_plan,
     get_focus_plan,
+    get_first_paid_tester_pack,
     get_admin_quality_summary,
     get_answered_question_detail,
     get_beta_feedback_summary,
@@ -282,6 +284,22 @@ class TestCore(unittest.TestCase):
         self.assertTrue(topics['items'])
         self.assertIn('recommended_reason', topics['items'][0])
 
+    def test_first_paid_tester_pack_has_30_questions(self):
+        pack = get_first_paid_tester_pack(self.student['id'], self.db)
+        self.assertEqual(pack['name'], 'First Paid Tester Pack')
+        self.assertEqual(pack['available_questions'], 30)
+        self.assertEqual(len(pack['items']), 30)
+        subjects = {item['subject_name'] for item in pack['items']}
+        self.assertIn('医学概論・基礎医学', subjects)
+        self.assertIn('医用電気電子工学', subjects)
+
+    def test_first_paid_tester_pack_csv_export(self):
+        output = Path(self.t.name) / 'first_paid_tester_pack.csv'
+        export_first_paid_pack(output, self.db)
+        lines = output.read_text(encoding='utf-8-sig').splitlines()
+        self.assertEqual(len(lines), 31)
+        self.assertIn('First Paid Tester Pack', lines[1])
+
     def test_exam_strategy_records_scores_and_events(self):
         set_target_exam_date(self.student['id'], (date.today() + timedelta(days=120)).isoformat(), self.db)
         add_exam_event(self.student['id'], 'mock', '第1回模試', (date.today() + timedelta(days=30)).isoformat(), db_path=self.db)
@@ -510,6 +528,12 @@ class TestApi(unittest.TestCase):
         frequent = self.client.get('/api/study/frequent-topics', headers=headers)
         self.assertEqual(frequent.status_code, 200, frequent.text)
         self.assertTrue(frequent.json()['items'])
+        pack = self.client.get('/api/study/first-paid-pack', headers=headers)
+        self.assertEqual(pack.status_code, 200, pack.text)
+        self.assertEqual(pack.json()['available_questions'], 30)
+        first_paid = self.client.get('/api/study/focus?mode=first_paid&count=30', headers=headers)
+        self.assertEqual(first_paid.status_code, 200, first_paid.text)
+        self.assertEqual(len(first_paid.json()['items']), 30)
         unmarked = self.client.post('/api/questions/2/bookmark', headers=headers, json={'bookmarked': False})
         self.assertFalse(unmarked.json()['bookmarked'])
 

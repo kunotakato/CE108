@@ -30,7 +30,8 @@ function StudyPageContent() {
     balanced: "バランス",
     wrong: "誤答だけ",
     frequent: "頻出テーマ",
-    bookmarked: "ブックマーク"
+    bookmarked: "ブックマーク",
+    first_paid: "有料候補30問"
   };
   const startedAt = useRef(Date.now());
   const [plan, setPlan] = useState<DailyPlan | null>(null);

@@ -5,6 +5,7 @@ __pycache__/
 .env
 data/*.db
 data/question_review_export.csv
+data/first_paid_tester_pack.csv
 .pytest_cache/
 .streamlit/secrets.toml
 .DS_Store

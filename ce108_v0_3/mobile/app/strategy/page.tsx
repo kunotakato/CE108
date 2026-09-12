@@ -158,7 +158,8 @@ export default function StrategyPage() {
     balanced: "バランス",
     wrong: "誤答だけ",
     frequent: "頻出テーマ",
-    bookmarked: "ブックマーク"
+    bookmarked: "ブックマーク",
+    first_paid: "有料候補30問"
   };
 
   return (
@@ -186,6 +187,7 @@ export default function StrategyPage() {
           <Link className="secondary-button" href="/study?mode=wrong">誤答だけ</Link>
           <Link className="secondary-button" href="/study?mode=frequent">頻出テーマ</Link>
           <Link className="secondary-button" href="/study?mode=bookmarked">ブックマーク</Link>
+          <Link className="secondary-button" href="/study?mode=first_paid">有料候補30問</Link>
         </div>
       </section>
       <section className="panel stack">

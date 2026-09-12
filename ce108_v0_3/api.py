@@ -24,6 +24,7 @@ from ce108.services import (
     generate_daily_plan,
     generate_note_questions,
     get_focus_plan,
+    get_first_paid_tester_pack,
     get_diagnostic_state,
     get_admin_quality_summary,
     get_answered_question_detail,
@@ -220,6 +221,10 @@ def study_focus(mode: str = 'balanced', count: int = 5, user=Depends(require_rol
 @app.get('/api/study/frequent-topics')
 def study_frequent_topics(limit: int = 10, user=Depends(require_role('student'))):
     return get_frequent_topics(user['id'], limit=limit)
+
+@app.get('/api/study/first-paid-pack')
+def study_first_paid_pack(user=Depends(require_role('student'))):
+    return get_first_paid_tester_pack(user['id'])
 
 @app.get('/api/study/bookmarks')
 def study_bookmarks(limit: int = 50, user=Depends(require_role('student'))):

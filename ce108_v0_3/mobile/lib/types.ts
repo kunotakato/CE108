@@ -216,7 +216,7 @@ export type FeedbackPayload = {
   user_agent?: string;
 };
 
-export type StudyMode = "medical" | "engineering" | "balanced" | "wrong" | "frequent" | "bookmarked";
+export type StudyMode = "medical" | "engineering" | "balanced" | "wrong" | "frequent" | "bookmarked" | "first_paid";
 
 export type RadarSubject = {
   subject_code: string;
