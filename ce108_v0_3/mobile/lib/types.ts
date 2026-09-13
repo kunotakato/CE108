@@ -152,6 +152,12 @@ export type LearningSummary = {
   accuracy: number;
   avg_seconds: number;
   due_reviews: number;
+  today_answers: number;
+  weekly_answers: number;
+  weekly_accuracy: number;
+  question_bank_total: number;
+  bank_goal: number;
+  bank_progress: number;
 };
 
 export type DailyStatus = {
@@ -257,6 +263,11 @@ export type StudyStrategy = {
   recommendation: string;
   events: ExamEvent[];
   latest_score?: Record<string, unknown> | null;
+  latest_score_rate?: number | null;
+  target_score_rate: number;
+  gap_to_target?: number | null;
+  readiness_label: string;
+  next_actions: Array<{ label: string; mode: StudyMode; reason: string }>;
   radar: RadarSubject[];
   weak_subjects: RadarSubject[];
   strong_subjects: RadarSubject[];

@@ -195,6 +195,32 @@ h3 {
   margin-top: 4px;
 }
 
+.strategy-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.strategy-card {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  min-height: 76px;
+  padding: 12px;
+}
+
+.strategy-card strong {
+  color: var(--primary);
+  font-size: 16px;
+}
+
+.strategy-card span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .panel {
   padding: 16px;
 }

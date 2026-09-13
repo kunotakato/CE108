@@ -197,7 +197,7 @@ class TestCore(unittest.TestCase):
     def test_seed_contains_expanded_original_questions_with_choice_explanations(self):
         total = fetch_one('SELECT COUNT(*) total FROM questions', (), self.db)['total']
         empty = fetch_one("SELECT COUNT(*) total FROM question_choices WHERE TRIM(COALESCE(explanation,''))=''", (), self.db)['total']
-        self.assertGreaterEqual(total, 140)
+        self.assertGreaterEqual(total, 300)
         self.assertEqual(empty, 0)
 
     def test_question_review_csv_export(self):
@@ -337,6 +337,9 @@ class TestCore(unittest.TestCase):
         self.assertEqual(strategy['recommended_mode'], 'medical')
         self.assertTrue(strategy['events'])
         self.assertTrue(strategy['radar'])
+        self.assertEqual(strategy['target_score_rate'], 80.0)
+        self.assertIn('readiness_label', strategy)
+        self.assertTrue(strategy['next_actions'])
 
     def test_daily_status_concurrent_generation_is_stable(self):
         with ThreadPoolExecutor(max_workers=4) as executor:
@@ -509,6 +512,8 @@ class TestApi(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn('accuracy', res.json())
         self.assertIn('due_reviews', res.json())
+        self.assertGreaterEqual(res.json()['question_bank_total'], 300)
+        self.assertIn('weekly_answers', res.json())
 
     def test_study_mastery_api(self):
         token = self._token()

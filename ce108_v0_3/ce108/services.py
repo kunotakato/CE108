@@ -498,7 +498,26 @@ def get_mastery_report(user_id:int,db_path:Path|str=DB_PATH):
     return [dict(r) for r in fetch_all('''SELECT s.name subject_name,t.name topic_name,COALESCE(m.mastery_score,0) mastery_score,COALESCE(m.retention_score,0) retention_score,COALESCE(m.total_answers,0) total_answers,COALESCE(m.correct_answers,0) correct_answers,m.last_answered_at FROM topics t JOIN subjects s ON s.id=t.subject_id LEFT JOIN user_topic_mastery m ON m.topic_id=t.id AND m.user_id=? ORDER BY mastery_score,s.display_order,t.display_order''',(user_id,),db_path)]
 
 def get_learning_summary(user_id:int,db_path:Path|str=DB_PATH):
-    r=fetch_one('SELECT COUNT(*) total,COALESCE(SUM(is_correct),0) correct,COALESCE(AVG(response_time_seconds),0) avg_seconds FROM answer_history WHERE user_id=?',(user_id,),db_path);due=fetch_one("SELECT COUNT(*) due FROM review_schedules WHERE user_id=? AND status='pending' AND scheduled_date<=?",(user_id,_today().isoformat()),db_path);total=int(r['total']);correct=int(r['correct']);return {'total':total,'correct':correct,'accuracy':round(correct/total*100,1) if total else 0,'avg_seconds':round(r['avg_seconds'],1),'due_reviews':due['due']}
+    today=_today()
+    r=fetch_one('SELECT COUNT(*) total,COALESCE(SUM(is_correct),0) correct,COALESCE(AVG(response_time_seconds),0) avg_seconds FROM answer_history WHERE user_id=?',(user_id,),db_path)
+    recent=fetch_one("SELECT COUNT(*) total,COALESCE(SUM(is_correct),0) correct FROM answer_history WHERE user_id=? AND substr(answered_at,1,10)>=?",(user_id,(today-timedelta(days=6)).isoformat()),db_path)
+    today_row=fetch_one("SELECT COUNT(*) total FROM answer_history WHERE user_id=? AND substr(answered_at,1,10)=?",(user_id,today.isoformat()),db_path)
+    due=fetch_one("SELECT COUNT(*) due FROM review_schedules WHERE user_id=? AND status='pending' AND scheduled_date<=?",(user_id,today.isoformat()),db_path)
+    bank=fetch_one("SELECT COUNT(*) n FROM questions WHERE status='published'",(),db_path)
+    total=int(r['total']);correct=int(r['correct']);recent_total=int(recent['total'] or 0);recent_correct=int(recent['correct'] or 0)
+    return {
+        'total':total,
+        'correct':correct,
+        'accuracy':round(correct/total*100,1) if total else 0,
+        'avg_seconds':round(r['avg_seconds'],1),
+        'due_reviews':due['due'],
+        'today_answers':int(today_row['total'] or 0),
+        'weekly_answers':recent_total,
+        'weekly_accuracy':round(recent_correct/recent_total*100,1) if recent_total else 0,
+        'question_bank_total':int(bank['n'] or 0),
+        'bank_goal':300,
+        'bank_progress':round(min(100,int(bank['n'] or 0)/300*100),1),
+    }
 
 def set_target_exam_date(user_id:int,target_exam_date:str,db_path:Path|str=DB_PATH):
     datetime.fromisoformat(target_exam_date)
@@ -554,7 +573,45 @@ def get_study_strategy(user_id:int,db_path:Path|str=DB_PATH):
     if phase=='final':recommended='medical' if med>=eng else 'engineering'
     elif med<75:recommended='medical'
     elif eng<75:recommended='engineering'
-    return {'target_exam_date':plan['target_exam_date'] if plan else None,'days_until_exam':days,'phase':phase,'phase_label':{'undecided':'試験日未設定','normal':'通常期','push':'追い込み期','final':'直前期'}[phase],'recommended_mode':recommended,'recommendation':('直前期は得意分野と頻出分野を固めましょう。' if phase=='final' else '苦手分野を優先して底上げしましょう。'),'events':events,'latest_score':dict(latest) if latest else None,'radar':radar,'weak_subjects':weak,'strong_subjects':strong,'weak_topics':mastery[:5]}
+    score_rate=round(float(latest['total_score'])/float(latest['max_score'])*100,1) if latest and latest['max_score'] else None
+    target_rate=80.0
+    gap=round(target_rate-score_rate,1) if score_rate is not None else None
+    readiness='合格ライン相当の土台あり' if score_rate is not None and score_rate>=80 else ('あと少しで8割圏' if score_rate is not None and score_rate>=70 else ('まず現在地を入力' if score_rate is None else '基礎の底上げ優先'))
+    if phase=='final':
+        recommendation='直前期は頻出・得意分野で取り切る問題を増やしましょう。'
+        next_actions=[
+            {'label':'頻出テーマを固める','mode':'frequent','reason':'直前期は出やすいテーマの取りこぼしを減らします。'},
+            {'label':'得点源を伸ばす','mode':recommended,'reason':'得意側を確実に取り切る練習に寄せます。'},
+            {'label':'間違えた問題だけ確認','mode':'wrong','reason':'直前の穴を短時間で確認します。'},
+        ]
+    else:
+        recommendation='苦手分野を優先して底上げし、模試の弱点を今日の5問へつなげましょう。'
+        weakest=weak[0]['subject_code'] if weak else None
+        weak_mode='medical' if weakest in {'MED','CLIN'} else 'engineering' if weakest else recommended
+        next_actions=[
+            {'label':'最弱分野を5問','mode':weak_mode,'reason':'レーダーで低い科目から底上げします。'},
+            {'label':'頻出テーマを5問','mode':'frequent','reason':'重要度と頻出度が高い問題で得点効率を上げます。'},
+            {'label':'間違えた問題を復習','mode':'wrong','reason':'一度間違えた知識を定着へ戻します。'},
+        ]
+    return {
+        'target_exam_date':plan['target_exam_date'] if plan else None,
+        'days_until_exam':days,
+        'phase':phase,
+        'phase_label':{'undecided':'試験日未設定','normal':'通常期','push':'追い込み期','final':'直前期'}[phase],
+        'recommended_mode':recommended,
+        'recommendation':recommendation,
+        'events':events,
+        'latest_score':dict(latest) if latest else None,
+        'latest_score_rate':score_rate,
+        'target_score_rate':target_rate,
+        'gap_to_target':gap,
+        'readiness_label':readiness,
+        'next_actions':next_actions,
+        'radar':radar,
+        'weak_subjects':weak,
+        'strong_subjects':strong,
+        'weak_topics':mastery[:5],
+    }
 
 def list_due_reviews(user_id:int,db_path:Path|str=DB_PATH):
     return [dict(r) for r in fetch_all('''SELECT r.scheduled_date,r.priority,q.id question_id,q.question_text,s.name subject_name,t.name topic_name FROM review_schedules r JOIN questions q ON q.id=r.question_id LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary' LEFT JOIN topics t ON t.id=m.topic_id LEFT JOIN subjects s ON s.id=t.subject_id WHERE r.user_id=? AND r.status='pending' ORDER BY r.scheduled_date,r.priority DESC''',(user_id,),db_path)]

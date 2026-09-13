@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState, ErrorState, LoadingState } from "@/components/StateViews";
-import { getDailyStatus, getMastery, getSummary, getToday } from "@/lib/api";
+import { getDailyStatus, getMastery, getStrategy, getSummary, getToday } from "@/lib/api";
 import { getStoredUser, getToken } from "@/lib/auth";
-import type { DailyPlan, DailyStatus, LearningSummary, MasteryRow, User } from "@/lib/types";
+import type { DailyPlan, DailyStatus, LearningSummary, MasteryRow, StudyStrategy, User } from "@/lib/types";
 
 export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -14,6 +14,7 @@ export default function HomePage() {
   const [dailyStatus, setDailyStatus] = useState<DailyStatus | null>(null);
   const [summary, setSummary] = useState<LearningSummary | null>(null);
   const [mastery, setMastery] = useState<MasteryRow[]>([]);
+  const [strategy, setStrategy] = useState<StudyStrategy | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -28,11 +29,12 @@ export default function HomePage() {
     setLoading(true);
     setError("");
     try {
-      const [today, status, learning, weak] = await Promise.all([getToday(token), getDailyStatus(token), getSummary(token), getMastery(token, 3)]);
+      const [today, status, learning, weak, nextStrategy] = await Promise.all([getToday(token), getDailyStatus(token), getSummary(token), getMastery(token, 3), getStrategy(token)]);
       setPlan(today);
       setDailyStatus(status);
       setSummary(learning);
       setMastery(weak);
+      setStrategy(nextStrategy);
     } catch (err) {
       setError(err instanceof Error ? err.message : "ホームを読み込めませんでした。");
     } finally {
@@ -87,6 +89,31 @@ export default function HomePage() {
           <strong>{summary?.due_reviews ?? 0}</strong>
           <span>復習待ち</span>
         </div>
+        <div className="metric">
+          <strong>{summary?.weekly_answers ?? 0}</strong>
+          <span>7日回答</span>
+        </div>
+        <div className="metric">
+          <strong>{summary?.question_bank_total ?? 0}</strong>
+          <span>公開問題</span>
+        </div>
+      </section>
+      <section className="panel stack">
+        <h2>今日の作戦</h2>
+        <p className="lead">{strategy?.readiness_label || "現在地を集計中です。"}</p>
+        <div className="strategy-card-list">
+          {(strategy?.next_actions || []).slice(0, 3).map((action) => (
+            <Link className="strategy-card" href={`/study?mode=${action.mode}`} key={`${action.mode}-${action.label}`}>
+              <strong>{action.label}</strong>
+              <span>{action.reason}</span>
+            </Link>
+          ))}
+        </div>
+        {strategy?.latest_score_rate != null ? (
+          <p className="muted">直近スコア {strategy.latest_score_rate}% / 目標 {strategy.target_score_rate}%</p>
+        ) : (
+          <p className="muted">模試や過去問の点数を入れると、今日の作戦が具体化します。</p>
+        )}
       </section>
       <section className="panel stack">
         <h2>7日間の学習</h2>
@@ -98,6 +125,14 @@ export default function HomePage() {
           ))}
         </div>
         <p className="muted">{dailyStatus?.tomorrow_preview.message}</p>
+        <p className="muted">今週 {summary?.weekly_answers ?? 0} 問 / 正答率 {summary?.weekly_accuracy ?? 0}%</p>
+      </section>
+      <section className="panel stack">
+        <h2>問題バンク</h2>
+        <div className="mastery-bar" aria-label={`問題バンク ${summary?.bank_progress ?? 0}%`}>
+          <div style={{ width: `${Math.min(100, Math.max(0, summary?.bank_progress ?? 0))}%` }} />
+        </div>
+        <p className="muted">{summary?.question_bank_total ?? 0}/{summary?.bank_goal ?? 300}問。毎日違う問題に触れられる土台を増やしています。</p>
       </section>
       <section className="panel stack">
         <h2>今日の内訳</h2>

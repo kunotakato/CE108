@@ -6,6 +6,7 @@ from .database import connect, initialize_database, utc_now
 from .first_paid_pack import FIRST_PAID_TESTER_PACK_CHOICE_UPDATES
 from .original_question_bank import EXPANDED_ORIGINAL_QUESTIONS
 from .security import hash_password
+from .supplemental_question_bank import SUPPLEMENTAL_ORIGINAL_QUESTIONS
 
 SUBJECTS=[('MED','医学概論・基礎医学'),('EEE','医用電気電子工学'),('MECH','医用機械工学・物理数学'),('MAT','生体物性材料工学'),('SUP','生体機能代行装置学'),('THER','医用治療機器学'),('MEAS','生体計測装置学'),('SAFE','医用機器安全管理学'),('CLIN','臨床医学総論')]
 TOPICS=[('MED','MED-ANAT','解剖・生理'),('MED','MED-BIO','生化学・代謝'),('EEE','EEE-CIR','電気回路'),('EEE','EEE-SIG','交流・信号'),('MECH','MECH-MATH','数学・単位変換'),('MECH','MECH-FLUID','圧力・流体'),('MAT','MAT-BIO','生体物性'),('SUP','SUP-HD','血液浄化'),('SUP','SUP-RESP','呼吸療法'),('SUP','SUP-ECC','体外循環'),('THER','THER-DEF','除細動・治療機器'),('MEAS','MEAS-SPO2','生体計測・SpO2'),('SAFE','SAFE-ELEC','電気安全'),('CLIN','CLIN-PATH','病態・臨床')]
@@ -67,6 +68,7 @@ C('MEAS-SPO2','パルスオキシメータで測定値が不安定になりや�
 C('THER-DEF','同期カルディオバージョンで同期が必要な主な理由はどれか。',['脆弱期への通電を避けるため','充電時間を必ずゼロにするため','電極を不要にするため','血圧計として使うため','酸素濃度を測るため'],[1],'同期によりR波に合わせて通電し、心室細動を誘発しやすい時相を避けます。',5,3,'single',['同期はR波に合わせ、脆弱期通電を避けるために重要です。','充電時間をゼロにする機能ではありません。','電極は通電に必要です。','血圧測定機能ではありません。','酸素濃度測定はパルスオキシメータなどの役割です。']),
 ]
 QUESTIONS.extend(EXPANDED_ORIGINAL_QUESTIONS)
+QUESTIONS.extend(SUPPLEMENTAL_ORIGINAL_QUESTIONS)
 
 def _apply_choice_updates(conn,updates:dict[str,list[tuple[str,bool,str]]]):
     for question_text, choices in updates.items():

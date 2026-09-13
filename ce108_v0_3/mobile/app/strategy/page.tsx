@@ -172,6 +172,31 @@ export default function StrategyPage() {
       </section>
       {error ? <ErrorState message={error} onRetry={load} /> : null}
       <section className="panel stack">
+        <h2>8割への現在地</h2>
+        <div className="metrics">
+          <div className="metric">
+            <strong>{strategy?.latest_score_rate == null ? "-" : `${strategy.latest_score_rate}%`}</strong>
+            <span>直近スコア</span>
+          </div>
+          <div className="metric">
+            <strong>{strategy?.gap_to_target == null ? "-" : strategy.gap_to_target <= 0 ? "到達" : `+${strategy.gap_to_target}%`}</strong>
+            <span>8割まで</span>
+          </div>
+        </div>
+        <p className="lead">{strategy?.readiness_label || "点数を入力すると現在地を表示します。"}</p>
+      </section>
+      <section className="panel stack">
+        <h2>今日やる3つ</h2>
+        <div className="strategy-card-list">
+          {(strategy?.next_actions || []).map((action) => (
+            <Link className="strategy-card" href={`/study?mode=${action.mode}`} key={`${action.mode}-${action.label}`}>
+              <strong>{action.label}</strong>
+              <span>{action.reason}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+      <section className="panel stack">
         <h2>科目別レーダー</h2>
         <RadarChart rows={strategy?.radar || []} />
         <div className="pill-row">
@@ -225,6 +250,7 @@ export default function StrategyPage() {
       </form>
       <form className="panel form" onSubmit={submitScore}>
         <h2>模試・過去問の点数</h2>
+        <p className="muted">点数を入れると、レーダーと今日やる3つが模試結果に寄ります。</p>
         <label className="field"><span>名称</span><input value={scoreTitle} onChange={(event) => setScoreTitle(event.target.value)} /></label>
         <div className="metrics">
           <label className="field"><span>総合点</span><input inputMode="decimal" value={totalScore} onChange={(event) => setTotalScore(event.target.value)} /></label>
