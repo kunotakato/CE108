@@ -3,6 +3,7 @@ import csv
 from pathlib import Path
 from .config import DATA_DIR, DB_PATH
 from .database import connect, initialize_database, utc_now
+from .first_paid_pack import FIRST_PAID_TESTER_PACK_CHOICE_UPDATES
 from .original_question_bank import EXPANDED_ORIGINAL_QUESTIONS
 from .security import hash_password
 
@@ -67,6 +68,22 @@ C('THER-DEF','同期カルディオバージョンで同期が必要な主な理
 ]
 QUESTIONS.extend(EXPANDED_ORIGINAL_QUESTIONS)
 
+def _apply_choice_updates(conn,updates:dict[str,list[tuple[str,bool,str]]]):
+    for question_text, choices in updates.items():
+        row=conn.execute('SELECT id FROM questions WHERE question_text=?',(question_text,)).fetchone()
+        if not row:continue
+        qid=row['id']
+        for i,(choice_text,is_correct,explanation) in enumerate(choices,1):
+            choice_code=str(i)
+            exists=conn.execute('SELECT id FROM question_choices WHERE question_id=? AND choice_code=?',(qid,choice_code)).fetchone()
+            if exists:
+                conn.execute('''UPDATE question_choices
+                    SET choice_text=?,is_correct=?,explanation=?,display_order=?
+                    WHERE question_id=? AND choice_code=?''',(choice_text,int(is_correct),explanation,i,qid,choice_code))
+            else:
+                conn.execute('''INSERT INTO question_choices(question_id,choice_code,choice_text,is_correct,explanation,display_order)
+                    VALUES(?,?,?,?,?,?)''',(qid,choice_code,choice_text,int(is_correct),explanation,i))
+
 def seed_database(db_path:Path|str=DB_PATH):
     initialize_database(db_path)
     with connect(db_path) as conn:
@@ -97,6 +114,7 @@ def seed_database(db_path:Path|str=DB_PATH):
         for row in conn.execute("SELECT c.id,c.choice_text,c.is_correct,q.explanation_short FROM question_choices c JOIN questions q ON q.id=c.question_id WHERE TRIM(COALESCE(c.explanation,''))=''"):
             explanation=row['explanation_short'] if row['is_correct'] else f"{row['choice_text']}は本問の正答ではありません。正答の根拠と比較し、どの条件が合わないかを確認してください。"
             conn.execute('UPDATE question_choices SET explanation=? WHERE id=?',(explanation,row['id']))
+        _apply_choice_updates(conn,FIRST_PAID_TESTER_PACK_CHOICE_UPDATES)
 
 def export_question_template(path:Path|None=None)->Path:
     path=path or DATA_DIR/'question_import_template.csv';cols=['question_type','question_text','choice_1','choice_2','choice_3','choice_4','choice_5','choice_1_explanation','choice_2_explanation','choice_3_explanation','choice_4_explanation','choice_5_explanation','correct_codes','numeric_answer','numeric_tolerance','unit','topic_code','explanation_short','explanation_standard','explanation_detailed','difficulty','importance','frequency_score','source_type','source_name','source_url','copyright_holder','permission_status','status']

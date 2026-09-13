@@ -204,7 +204,7 @@ def question(qid: int, user=Depends(current_user)):
     q = get_question(qid)
     if not q or (q['status'] != 'published' and user['role'] != 'admin'):
         raise HTTPException(404, '問題がありません。')
-    return public_question(q)
+    return public_question(q, user['id'])
 
 @app.post('/api/questions/{qid}/answer')
 def answer(qid: int, req: AnswerRequest, user=Depends(require_role('student'))):

@@ -39,6 +39,7 @@ from ce108.services import (
     get_study_strategy,
     is_question_bookmarked,
     list_bookmarked_questions,
+    public_question,
     create_student_note,
     extract_note_upload_text,
     generate_note_questions,
@@ -292,6 +293,26 @@ class TestCore(unittest.TestCase):
         subjects = {item['subject_name'] for item in pack['items']}
         self.assertIn('医学概論・基礎医学', subjects)
         self.assertIn('医用電気電子工学', subjects)
+
+    def test_public_question_shuffles_choices_without_leaking_correctness(self):
+        qid = fetch_one("SELECT id FROM questions WHERE question_text=?", ('血圧を規定する要素として最も基本的な組合せはどれか。',), self.db)['id']
+        q = get_question(qid, self.db)
+        public = public_question(q, self.student['id'])
+        self.assertNotEqual([c['choice_code'] for c in public['choices']], [c['choice_code'] for c in q['choices']])
+        self.assertNotIn('correct_codes', public)
+        self.assertNotIn('numeric_answer', public)
+        self.assertTrue(all('is_correct' not in c and 'explanation' not in c for c in public['choices']))
+        self.assertTrue(check_answer(q, q['correct_codes'], None))
+
+    def test_first_paid_pack_distractors_are_plausible(self):
+        qid = fetch_one("SELECT id FROM questions WHERE question_text=?", ('ショックで共通して問題となる病態として最も適切なのはどれか。',), self.db)['id']
+        q = get_question(qid, self.db)
+        choices = {c['choice_text'] for c in q['choices']}
+        self.assertIn('組織灌流の不足', choices)
+        self.assertIn('心拍出量の増加', choices)
+        self.assertIn('末梢血管抵抗の上昇のみ', choices)
+        self.assertNotIn('視力の改善', choices)
+        self.assertNotIn('骨形成の亢進', choices)
 
     def test_first_paid_tester_pack_csv_export(self):
         output = Path(self.t.name) / 'first_paid_tester_pack.csv'

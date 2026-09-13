@@ -1,5 +1,5 @@
 from __future__ import annotations
-import csv, io, json, math, os, re
+import csv, hashlib, io, json, math, os, re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -102,10 +102,19 @@ def list_questions(status='published',limit=500,db_path:Path|str=DB_PATH):
     params=(status,limit) if status else (limit,)
     return [dict(r) for r in fetch_all(f'''SELECT q.id,q.question_type,q.question_text,q.difficulty,q.importance,q.frequency_score,q.source_type,q.status,s.name subject_name,t.name topic_name FROM questions q LEFT JOIN question_topic_mappings m ON m.question_id=q.id AND m.mapping_type='primary' LEFT JOIN topics t ON t.id=m.topic_id LEFT JOIN subjects s ON s.id=t.subject_id {where} ORDER BY q.id LIMIT ?''',params,db_path)]
 
-def public_question(q:dict)->dict:
+def _stable_choice_order(user_id:int|None,question_id:int,choice:dict)->str:
+    key=f'{user_id or 0}:{question_id}:{choice.get("choice_code")}'
+    return hashlib.sha256(key.encode('utf-8')).hexdigest()
+
+def public_question(q:dict,user_id:int|None=None)->dict:
     safe=dict(q);safe.pop('correct_codes',None);safe.pop('numeric_answer',None)
     safe.pop('explanation_short',None);safe.pop('explanation_standard',None);safe.pop('explanation_detailed',None)
-    for c in safe.get('choices',[]):c.pop('is_correct',None);c.pop('explanation',None)
+    choices=[dict(c) for c in safe.get('choices',[])]
+    choices.sort(key=lambda c:_stable_choice_order(user_id,q.get('id'),c))
+    for i,c in enumerate(choices,1):
+        c.pop('is_correct',None);c.pop('explanation',None)
+        c['display_order']=i
+    safe['choices']=choices
     return safe
 
 def related_questions(user_id:int,question_id:int,limit:int=3,db_path:Path|str=DB_PATH):
