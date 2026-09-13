@@ -106,16 +106,52 @@ def _stable_choice_order(user_id:int|None,question_id:int,choice:dict)->str:
     key=f'{user_id or 0}:{question_id}:{choice.get("choice_code")}'
     return hashlib.sha256(key.encode('utf-8')).hexdigest()
 
+def _display_choice_pairs(q:dict,user_id:int|None)->list[tuple[str,dict]]:
+    choices=[dict(c) for c in q.get('choices',[])]
+    choices.sort(key=lambda c:_stable_choice_order(user_id,q.get('id'),c))
+    return [(str(i),c) for i,c in enumerate(choices,1)]
+
+def _public_to_original_choice_codes(q:dict,user_id:int|None,selected_codes:list[str]|None)->list[str]:
+    mapping={display_code:choice['choice_code'] for display_code,choice in _display_choice_pairs(q,user_id)}
+    return [mapping.get(str(code),str(code)) for code in (selected_codes or [])]
+
+def _original_to_public_choice_codes(q:dict,user_id:int|None,selected_codes:list[str]|None)->list[str]:
+    mapping={choice['choice_code']:display_code for display_code,choice in _display_choice_pairs(q,user_id)}
+    return [mapping.get(str(code),str(code)) for code in (selected_codes or [])]
+
 def public_question(q:dict,user_id:int|None=None)->dict:
     safe=dict(q);safe.pop('correct_codes',None);safe.pop('numeric_answer',None)
     safe.pop('explanation_short',None);safe.pop('explanation_standard',None);safe.pop('explanation_detailed',None)
-    choices=[dict(c) for c in safe.get('choices',[])]
-    choices.sort(key=lambda c:_stable_choice_order(user_id,q.get('id'),c))
-    for i,c in enumerate(choices,1):
+    choices=[]
+    for display_code,c in _display_choice_pairs(q,user_id):
         c.pop('is_correct',None);c.pop('explanation',None)
-        c['display_order']=i
+        c['choice_code']=display_code
+        c['display_order']=int(display_code)
+        choices.append(c)
     safe['choices']=choices
     return safe
+
+def _with_public_feedback_codes(q:dict,user_id:int|None,selected_original_codes:list[str]|None)->dict:
+    original_correct=list(q.get('correct_codes') or [])
+    feedback={c['choice_code']:c for c in _choice_feedback(q,selected_original_codes)}
+    public_feedback=[]
+    public_choices=[]
+    public_correct=[]
+    for display_code,choice in _display_choice_pairs(q,user_id):
+        original_code=choice['choice_code']
+        public_choice=dict(choice)
+        public_choice['choice_code']=display_code
+        public_choice['display_order']=int(display_code)
+        public_choices.append(public_choice)
+        if original_code in original_correct:public_correct.append(display_code)
+        item=dict(feedback.get(original_code,choice))
+        item['choice_code']=display_code
+        item['display_order']=int(display_code)
+        public_feedback.append(item)
+    q['choices']=public_choices
+    q['correct_codes']=public_correct
+    q['choice_feedback']=public_feedback
+    return q
 
 def related_questions(user_id:int,question_id:int,limit:int=3,db_path:Path|str=DB_PATH):
     topic=fetch_one("SELECT topic_id FROM question_topic_mappings WHERE question_id=? AND mapping_type='primary'",(question_id,),db_path)
@@ -322,16 +358,17 @@ def schedule_review(user_id:int,question_id:int,correct:bool,confidence:str,impo
     target=(_today()+timedelta(days=days)).isoformat()
     execute("INSERT OR IGNORE INTO review_schedules(user_id,question_id,review_type,scheduled_date,priority,status,created_at) VALUES(?,?, 'same_or_similar',?,?,'pending',?)",(user_id,question_id,target,float(importance),utc_now()),db_path);return target
 
-def record_answer(user_id:int,question_id:int,selected_codes:list[str]|None,numeric_answer:float|None,confidence:str,response_time_seconds:int,answer_mode:str,session_id:str|None=None,db_path:Path|str=DB_PATH):
+def record_answer(user_id:int,question_id:int,selected_codes:list[str]|None,numeric_answer:float|None,confidence:str,response_time_seconds:int,answer_mode:str,session_id:str|None=None,db_path:Path|str=DB_PATH,public_choice_codes:bool=False):
     q=get_question(question_id,db_path)
     if not q:raise ValueError('問題が見つかりません。')
     if q['status']!='published':raise ValueError('公開中の問題ではありません。')
     if q['question_type']=='numeric' and numeric_answer is None:raise ValueError('数値回答を入力してください。')
     if q['question_type']!='numeric' and not selected_codes:raise ValueError('選択肢を選んでください。')
-    correct=check_answer(q,selected_codes,numeric_answer)
-    execute('''INSERT INTO answer_history(user_id,question_id,selected_answer,numeric_answer,is_correct,confidence_level,response_time_seconds,answer_mode,session_id,answered_at) VALUES(?,?,?,?,?,?,?,?,?,?)''',(user_id,question_id,json.dumps(selected_codes or [],ensure_ascii=False),numeric_answer,int(correct),confidence,max(0,int(response_time_seconds)),answer_mode,session_id,utc_now()),db_path)
+    original_selected_codes=_public_to_original_choice_codes(q,user_id,selected_codes) if public_choice_codes and q['question_type']!='numeric' else (selected_codes or [])
+    correct=check_answer(q,original_selected_codes,numeric_answer)
+    execute('''INSERT INTO answer_history(user_id,question_id,selected_answer,numeric_answer,is_correct,confidence_level,response_time_seconds,answer_mode,session_id,answered_at) VALUES(?,?,?,?,?,?,?,?,?,?)''',(user_id,question_id,json.dumps(original_selected_codes or [],ensure_ascii=False),numeric_answer,int(correct),confidence,max(0,int(response_time_seconds)),answer_mode,session_id,utc_now()),db_path)
     update_mastery(user_id,question_id,correct,confidence,response_time_seconds,db_path);review=schedule_review(user_id,question_id,correct,confidence,int(q['importance']),db_path)
-    q['choice_feedback']=_choice_feedback(q,selected_codes)
+    q=_with_public_feedback_codes(q,user_id,original_selected_codes) if q['question_type']!='numeric' else q
     q['learning_point']=_question_learning_point(q)
     q['answer_statistics']=_answer_statistics(question_id,db_path)
     q['visual_aid']=_question_visual_aid(q)
@@ -352,8 +389,9 @@ def get_answered_question_detail(user_id:int,question_id:int,db_path:Path|str=DB
     q=get_question(question_id,db_path)
     if not q:raise ValueError('問題が見つかりません。')
     selected_codes=_parse_selected_codes(latest['selected_answer'])
+    public_selected_codes=_original_to_public_choice_codes(q,user_id,selected_codes) if q['question_type']!='numeric' else selected_codes
     review=fetch_one('''SELECT scheduled_date FROM review_schedules WHERE user_id=? AND question_id=? ORDER BY scheduled_date DESC,id DESC LIMIT 1''',(user_id,question_id),db_path)
-    q['choice_feedback']=_choice_feedback(q,selected_codes)
+    q=_with_public_feedback_codes(q,user_id,selected_codes) if q['question_type']!='numeric' else q
     q['learning_point']=_question_learning_point(q)
     q['answer_statistics']=_answer_statistics(question_id,db_path)
     q['visual_aid']=_question_visual_aid(q)
@@ -363,7 +401,7 @@ def get_answered_question_detail(user_id:int,question_id:int,db_path:Path|str=DB
         'review_date':review['scheduled_date'] if review else None,
         'latest_answer':{
             'id':latest['id'],
-            'selected_codes':selected_codes,
+            'selected_codes':public_selected_codes,
             'numeric_answer':latest['numeric_answer'],
             'confidence':latest['confidence_level'],
             'response_time_seconds':latest['response_time_seconds'],
@@ -805,10 +843,10 @@ def get_diagnostic_state(user_id:int,session_id:int|None=None,db_path:Path|str=D
     if not s:return None
     d=dict(s);d['items']=[dict(r) for r in fetch_all('SELECT * FROM diagnostic_items WHERE diagnostic_session_id=? ORDER BY display_order',(s['id'],),db_path)];return d
 
-def answer_diagnostic(user_id:int,session_id:int,question_id:int,selected_codes:list[str]|None,numeric_answer:float|None,confidence:str,seconds:int,db_path:Path|str=DB_PATH):
+def answer_diagnostic(user_id:int,session_id:int,question_id:int,selected_codes:list[str]|None,numeric_answer:float|None,confidence:str,seconds:int,db_path:Path|str=DB_PATH,public_choice_codes:bool=False):
     state=get_diagnostic_state(user_id,session_id,db_path);item=next((x for x in state['items'] if x['question_id']==question_id),None) if state else None
     if not item or item['answered']:raise ValueError('回答できない問題です。')
-    result=record_answer(user_id,question_id,selected_codes,numeric_answer,confidence,seconds,'diagnostic',str(session_id),db_path)
+    result=record_answer(user_id,question_id,selected_codes,numeric_answer,confidence,seconds,'diagnostic',str(session_id),db_path,public_choice_codes=public_choice_codes)
     with connect(db_path) as conn:
         conn.execute('UPDATE diagnostic_items SET answered=1 WHERE id=?',(item['id'],));n=conn.execute('SELECT COUNT(*) n FROM diagnostic_items WHERE diagnostic_session_id=? AND answered=1',(session_id,)).fetchone()['n'];total=len(state['items']);conn.execute('UPDATE diagnostic_sessions SET current_index=? WHERE id=?',(n,session_id))
         if n>=total:conn.execute("UPDATE diagnostic_sessions SET status='completed',completed_at=? WHERE id=?",(utc_now(),session_id));conn.execute('UPDATE user_profiles SET diagnostic_completed=1 WHERE user_id=?',(user_id,))

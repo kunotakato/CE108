@@ -125,7 +125,8 @@ class TestCore(unittest.TestCase):
         self.assertIn('visual_aid', detail['question'])
         self.assertIn('choice_feedback', detail['question'])
         self.assertIn('explanation_standard', detail['question'])
-        self.assertEqual(detail['latest_answer']['selected_codes'], q['correct_codes'])
+        public_correct = [c['choice_code'] for c in detail['question']['choice_feedback'] if c['is_correct']]
+        self.assertEqual(detail['latest_answer']['selected_codes'], public_correct)
 
     def test_learning_history_contains_recent_answers(self):
         q = get_question(1, self.db)
@@ -298,11 +299,17 @@ class TestCore(unittest.TestCase):
         qid = fetch_one("SELECT id FROM questions WHERE question_text=?", ('血圧を規定する要素として最も基本的な組合せはどれか。',), self.db)['id']
         q = get_question(qid, self.db)
         public = public_question(q, self.student['id'])
-        self.assertNotEqual([c['choice_code'] for c in public['choices']], [c['choice_code'] for c in q['choices']])
+        self.assertEqual([c['choice_code'] for c in public['choices']], ['1', '2', '3', '4', '5'])
+        self.assertNotEqual([c['choice_text'] for c in public['choices']], [c['choice_text'] for c in q['choices']])
         self.assertNotIn('correct_codes', public)
         self.assertNotIn('numeric_answer', public)
         self.assertTrue(all('is_correct' not in c and 'explanation' not in c for c in public['choices']))
-        self.assertTrue(check_answer(q, q['correct_codes'], None))
+        correct_text = next(c['choice_text'] for c in q['choices'] if c['choice_code'] in q['correct_codes'])
+        public_correct_code = next(c['choice_code'] for c in public['choices'] if c['choice_text'] == correct_text)
+        result = record_answer(self.student['id'], q['id'], [public_correct_code], None, '確実に分かる', 20, 'test', db_path=self.db, public_choice_codes=True)
+        self.assertTrue(result['is_correct'])
+        self.assertEqual(result['question']['correct_codes'], [public_correct_code])
+        self.assertTrue(any(c['choice_code'] == public_correct_code and c['is_correct'] for c in result['question']['choice_feedback']))
 
     def test_first_paid_pack_distractors_are_plausible(self):
         qid = fetch_one("SELECT id FROM questions WHERE question_text=?", ('ショックで共通して問題となる病態として最も適切なのはどれか。',), self.db)['id']

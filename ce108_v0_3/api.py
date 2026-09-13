@@ -208,7 +208,7 @@ def question(qid: int, user=Depends(current_user)):
 
 @app.post('/api/questions/{qid}/answer')
 def answer(qid: int, req: AnswerRequest, user=Depends(require_role('student'))):
-    return record_answer(user['id'], qid, req.selected_codes, req.numeric_answer, req.confidence, req.response_time_seconds, req.answer_mode)
+    return record_answer(user['id'], qid, req.selected_codes, req.numeric_answer, req.confidence, req.response_time_seconds, req.answer_mode, public_choice_codes=True)
 
 @app.get('/api/study/today')
 def today(count: int = 5, user=Depends(require_role('student'))):
@@ -346,7 +346,7 @@ def diag_state(sid: int, user=Depends(require_role('student'))):
 
 @app.post('/api/diagnostics/{sid}/answer')
 def diag_answer(sid: int, req: DiagnosticAnswerRequest, user=Depends(require_role('student'))):
-    return answer_diagnostic(user['id'], sid, req.question_id, req.selected_codes, req.numeric_answer, req.confidence, req.response_time_seconds)
+    return answer_diagnostic(user['id'], sid, req.question_id, req.selected_codes, req.numeric_answer, req.confidence, req.response_time_seconds, public_choice_codes=True)
 
 @app.get('/api/diagnostics/{sid}/result')
 def diag_result(sid: int, user=Depends(require_role('student'))):
