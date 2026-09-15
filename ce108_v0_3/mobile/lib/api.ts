@@ -12,6 +12,7 @@ import type {
   MasteryRow,
   NoteExtractResult,
   NoteQuestion,
+  PastExamThemeList,
   Question,
   ReviewQueue,
   ScoreRecordPayload,
@@ -108,6 +109,10 @@ export async function getBookmarks(token: string, limit = 50) {
 
 export async function getFrequentTopics(token: string, limit = 10) {
   return apiFetch<FrequentTopicList>(`/api/study/frequent-topics?limit=${limit}`, { token });
+}
+
+export async function getPastExamThemes(token: string, limit = 200) {
+  return apiFetch<PastExamThemeList>(`/api/study/past-exam-themes?limit=${limit}`, { token });
 }
 
 export async function getHistory(token: string, limit = 50) {

@@ -155,6 +155,7 @@ export default function HomePage() {
         <div className="mode-grid">
           <Link className="secondary-button" href="/study?mode=wrong">間違えた問題だけ</Link>
           <Link className="secondary-button" href="/study?mode=frequent">頻出テーマ</Link>
+          <Link className="secondary-button" href="/past-exams">年度別・分野別</Link>
           <Link className="secondary-button" href="/study?mode=bookmarked">ブックマーク</Link>
           <Link className="secondary-button" href="/study?mode=first_paid">有料候補30問</Link>
         </div>

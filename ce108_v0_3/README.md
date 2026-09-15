@@ -115,6 +115,8 @@
 
 国試風オリジナル問題の作成ルールは`docs/QUESTION_AUTHORING_GUIDE.md`を参照してください。
 
+過去問の年度・午前/午後・問番号・頻出テーマだけを扱う分析台帳は`docs/PAST_EXAM_THEME_INDEX.md`を参照してください。公式問題文・選択肢・解説文は保存しません。
+
 競合アプリから取り入れるべき学習体験、課金価値、優先ロードマップは`docs/COMPETITIVE_MODELING.md`を参照してください。
 
 月額1,480円を前提にした無料/有料の境界設計は`docs/MONETIZATION_BOUNDARY.md`を参照してください。
@@ -258,6 +260,7 @@ docs/ADMIN_STREAMLIT_RENDER_DECISION.md
 docs/FIRST_TESTER_RECHECK_CHECKLIST.md
 docs/QUESTION_REVIEW_REPORT.md
 docs/QUESTION_AUTHORING_GUIDE.md
+docs/PAST_EXAM_THEME_INDEX.md
 ```
 
 ## Mobile v0.4.4

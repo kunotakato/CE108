@@ -312,6 +312,46 @@ export type FrequentTopicList = {
   total: number;
 };
 
+export type PastExamThemeRef = {
+  id: number;
+  exam_round: number;
+  exam_year?: number | null;
+  session: "午前" | "午後" | "AM" | "PM";
+  question_number: number;
+  exam_label: string;
+  derived_theme: string;
+  keywords: string[];
+  source_url?: string | null;
+  copyright_status: string;
+  official_text_included: number;
+  is_safe_for_paid: boolean;
+  topic_code: string;
+  topic_name: string;
+  subject_code: string;
+  subject_name: string;
+  linked_question_id?: number | null;
+  linked_question_text?: string | null;
+  linked_question_type?: QuestionType | null;
+  note?: string | null;
+};
+
+export type PastExamThemeSummary = {
+  topic_code: string;
+  topic_name: string;
+  subject_name: string;
+  derived_theme: string;
+  count: number;
+  latest_exam_round: number;
+  linked_question_id?: number | null;
+};
+
+export type PastExamThemeList = {
+  items: PastExamThemeRef[];
+  themes: PastExamThemeSummary[];
+  total: number;
+  policy: string;
+};
+
 export type StudentNote = {
   id: number;
   user_id: number;

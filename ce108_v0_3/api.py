@@ -42,6 +42,7 @@ from ce108.services import (
     get_teacher_support_summary,
     get_user,
     get_study_strategy,
+    list_past_exam_theme_refs,
     list_assignment_results,
     list_note_questions,
     list_bookmarked_questions,
@@ -57,6 +58,7 @@ from ce108.services import (
     set_question_bookmark,
     set_target_exam_date,
     start_diagnostic,
+    upsert_past_exam_theme_ref,
 )
 
 @asynccontextmanager
@@ -154,6 +156,18 @@ class BookmarkRequest(BaseModel):
     bookmarked: bool = True
     note: str = ''
 
+class PastExamThemeRefRequest(BaseModel):
+    exam_round: int = Field(ge=1)
+    exam_year: int = Field(ge=1900)
+    session: str
+    question_number: int = Field(ge=1)
+    topic_code: str
+    derived_theme: str = Field(min_length=2, max_length=200)
+    keywords: list[str] = Field(default_factory=list)
+    source_url: str | None = None
+    linked_question_id: int | None = None
+    note: str = ''
+
 def current_user(token: Annotated[str, Depends(oauth)]):
     try:
         payload = decode_access_token(token)
@@ -221,6 +235,10 @@ def study_focus(mode: str = 'balanced', count: int = 5, user=Depends(require_rol
 @app.get('/api/study/frequent-topics')
 def study_frequent_topics(limit: int = 10, user=Depends(require_role('student'))):
     return get_frequent_topics(user['id'], limit=limit)
+
+@app.get('/api/study/past-exam-themes')
+def study_past_exam_themes(exam_round: int | None = None, session: str | None = None, topic_code: str | None = None, limit: int = 200, user=Depends(require_role('student'))):
+    return list_past_exam_theme_refs(exam_round=exam_round, session=session, topic_code=topic_code, limit=limit)
 
 @app.get('/api/study/first-paid-pack')
 def study_first_paid_pack(user=Depends(require_role('student'))):
@@ -400,6 +418,13 @@ def admin_tester_activity(limit: int = 200, user=Depends(require_role('admin')))
 @app.post('/api/admin/tester-students')
 def admin_create_tester_student(req: BetaStudentRequest, user=Depends(require_role('admin'))):
     return create_beta_student(req.email, req.password, req.display_name, req.grade, req.school_name, req.target_exam_year)
+
+@app.post('/api/admin/past-exam-themes')
+def admin_past_exam_theme(req: PastExamThemeRefRequest, user=Depends(require_role('admin'))):
+    try:
+        return upsert_past_exam_theme_ref(req.exam_round, req.exam_year, req.session, req.question_number, req.topic_code, req.derived_theme, req.keywords, req.source_url, req.linked_question_id, req.note)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 @app.post('/api/admin/questions')
 def admin_create_question(req: AdminQuestionRequest, user=Depends(require_role('admin'))):

@@ -219,6 +219,58 @@ def get_frequent_topics(user_id:int,limit:int=10,db_path:Path|str=DB_PATH):
         items.append(d)
     return {'items':items,'total':len(items)}
 
+def list_past_exam_theme_refs(exam_round:int|None=None,session:str|None=None,topic_code:str|None=None,limit:int=200,db_path:Path|str=DB_PATH):
+    params=[]
+    where=['r.official_text_included=0']
+    if exam_round:
+        where.append('r.exam_round=?');params.append(int(exam_round))
+    if session:
+        where.append('r.session=?');params.append(session)
+    if topic_code:
+        where.append('t.code=?');params.append(topic_code)
+    params.append(max(1,min(int(limit or 200),500)))
+    rows=fetch_all(f'''SELECT r.id,r.exam_round,r.exam_year,r.session,r.question_number,r.derived_theme,r.keywords,r.source_url,
+        r.copyright_status,r.official_text_included,r.note,t.code topic_code,t.name topic_name,s.code subject_code,s.name subject_name,
+        q.id linked_question_id,q.question_text linked_question_text,q.question_type linked_question_type
+        FROM past_exam_theme_refs r
+        JOIN topics t ON t.id=r.topic_id
+        JOIN subjects s ON s.id=t.subject_id
+        LEFT JOIN questions q ON q.id=r.linked_question_id
+        WHERE {' AND '.join(where)}
+        ORDER BY r.exam_round DESC,CASE r.session WHEN '午前' THEN 0 WHEN 'AM' THEN 0 ELSE 1 END,r.question_number,t.display_order
+        LIMIT ?''',params,db_path)
+    items=[]
+    for r in rows:
+        d=dict(r)
+        try:d['keywords']=json.loads(d.get('keywords') or '[]')
+        except Exception:d['keywords']=[]
+        d['exam_label']=f"第{d['exam_round']}回 {d['session']} 第{d['question_number']}問"
+        d['is_safe_for_paid']=d['copyright_status']=='metadata_only' and int(d['official_text_included'] or 0)==0
+        items.append(d)
+    summary={}
+    for item in items:
+        key=(item['topic_code'],item['derived_theme'])
+        cur=summary.setdefault(key,{'topic_code':item['topic_code'],'topic_name':item['topic_name'],'subject_name':item['subject_name'],'derived_theme':item['derived_theme'],'count':0,'latest_exam_round':item['exam_round'],'linked_question_id':item.get('linked_question_id')})
+        cur['count']+=1
+        cur['latest_exam_round']=max(cur['latest_exam_round'],item['exam_round'])
+        cur['linked_question_id']=cur['linked_question_id'] or item.get('linked_question_id')
+    themes=sorted(summary.values(),key=lambda x:(-x['count'],-x['latest_exam_round'],x['topic_code']))[:50]
+    return {'items':items,'themes':themes,'total':len(items),'policy':'公式問題文・選択肢・解説文は保存せず、年度、午前/午後、問番号、頻出テーマ、CE108類題だけを扱います。'}
+
+def upsert_past_exam_theme_ref(exam_round:int,exam_year:int,session:str,question_number:int,topic_code:str,derived_theme:str,keywords:list[str]|None=None,source_url:str|None=None,linked_question_id:int|None=None,note:str='',db_path:Path|str=DB_PATH):
+    topic=fetch_one('SELECT id FROM topics WHERE code=?',(topic_code,),db_path)
+    if not topic:raise ValueError('トピックコードが見つかりません。')
+    if session not in {'午前','午後','AM','PM'}:raise ValueError('sessionは午前/午後/AM/PMで入力してください。')
+    if linked_question_id and not fetch_one("SELECT id FROM questions WHERE id=? AND status='published'",(linked_question_id,),db_path):raise ValueError('公開中のCE108類題が見つかりません。')
+    now=utc_now()
+    with connect(db_path) as conn:
+        conn.execute('''INSERT INTO past_exam_theme_refs(exam_round,exam_year,session,question_number,topic_id,derived_theme,keywords,source_url,copyright_status,official_text_included,linked_question_id,note,created_at,updated_at)
+            VALUES(?,?,?,?,?,?,?,?, 'metadata_only',0,?,?,?,?)
+            ON CONFLICT(exam_round,session,question_number,topic_id,derived_theme)
+            DO UPDATE SET exam_year=excluded.exam_year,keywords=excluded.keywords,source_url=excluded.source_url,linked_question_id=excluded.linked_question_id,note=excluded.note,updated_at=excluded.updated_at''',
+            (int(exam_round),int(exam_year),session,int(question_number),topic['id'],derived_theme.strip(),json.dumps(keywords or [],ensure_ascii=False),source_url,linked_question_id,note.strip() or None,now,now))
+    return list_past_exam_theme_refs(exam_round=exam_round,session=session,topic_code=topic_code,limit=500,db_path=db_path)
+
 def get_first_paid_tester_pack(user_id:int,db_path:Path|str=DB_PATH):
     plan=get_focus_plan(user_id,'first_paid',30,db_path)
     return {**FIRST_PAID_TESTER_PACK_POLICY,'items':plan['items'],'available_questions':len(plan['items'])}

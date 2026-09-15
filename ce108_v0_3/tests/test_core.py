@@ -37,6 +37,7 @@ from ce108.services import (
     get_student_summary_for_teacher,
     get_teacher_support_summary,
     get_study_strategy,
+    list_past_exam_theme_refs,
     is_question_bookmarked,
     list_bookmarked_questions,
     public_question,
@@ -54,6 +55,7 @@ from ce108.services import (
     set_target_exam_date,
     set_user_password,
     start_diagnostic,
+    upsert_past_exam_theme_ref,
 )
 
 
@@ -321,6 +323,32 @@ class TestCore(unittest.TestCase):
         self.assertNotIn('視力の改善', choices)
         self.assertNotIn('骨形成の亢進', choices)
 
+    def test_past_exam_theme_refs_store_metadata_without_official_text(self):
+        q = fetch_one("SELECT id FROM questions WHERE status='published' LIMIT 1", (), self.db)
+        refs = upsert_past_exam_theme_ref(
+            39,
+            2026,
+            '午前',
+            1,
+            'MED-ANAT',
+            '刺激伝導系',
+            ['心臓', '洞房結節'],
+            'https://example.com/source',
+            q['id'],
+            '公式本文は保存せず、出題位置とテーマだけを扱う。',
+            self.db,
+        )
+        self.assertEqual(refs['total'], 1)
+        item = refs['items'][0]
+        self.assertEqual(item['exam_label'], '第39回 午前 第1問')
+        self.assertEqual(item['copyright_status'], 'metadata_only')
+        self.assertEqual(item['official_text_included'], 0)
+        self.assertTrue(item['is_safe_for_paid'])
+        self.assertEqual(item['keywords'], ['心臓', '洞房結節'])
+        listed = list_past_exam_theme_refs(topic_code='MED-ANAT', db_path=self.db)
+        self.assertEqual(listed['themes'][0]['derived_theme'], '刺激伝導系')
+        self.assertIn('公式問題文', listed['policy'])
+
     def test_first_paid_tester_pack_csv_export(self):
         output = Path(self.t.name) / 'first_paid_tester_pack.csv'
         export_first_paid_pack(output, self.db)
@@ -569,6 +597,34 @@ class TestApi(unittest.TestCase):
         self.assertEqual(len(first_paid.json()['items']), 30)
         unmarked = self.client.post('/api/questions/2/bookmark', headers=headers, json={'bookmarked': False})
         self.assertFalse(unmarked.json()['bookmarked'])
+
+    def test_past_exam_theme_refs_api(self):
+        admin_token = self._token('admin@ce108.local')
+        student_token = self._token()
+        payload = {
+            'exam_round': 39,
+            'exam_year': 2026,
+            'session': '午後',
+            'question_number': 12,
+            'topic_code': 'MED-ANAT',
+            'derived_theme': '刺激伝導系',
+            'keywords': ['心臓', '伝導路'],
+            'source_url': 'https://example.com/source',
+            'linked_question_id': 1,
+            'note': '公式本文は保存しない',
+        }
+        created = self.client.post('/api/admin/past-exam-themes', headers={'Authorization': f'Bearer {admin_token}'}, json=payload)
+        self.assertEqual(created.status_code, 200, created.text)
+        self.assertEqual(created.json()['items'][0]['exam_label'], '第39回 午後 第12問')
+        forbidden = self.client.post('/api/admin/past-exam-themes', headers={'Authorization': f'Bearer {student_token}'}, json=payload)
+        self.assertEqual(forbidden.status_code, 403)
+        listed = self.client.get('/api/study/past-exam-themes', headers={'Authorization': f'Bearer {student_token}'})
+        self.assertEqual(listed.status_code, 200, listed.text)
+        body = listed.json()
+        self.assertGreaterEqual(body['total'], 1)
+        self.assertEqual(body['items'][0]['copyright_status'], 'metadata_only')
+        self.assertEqual(body['items'][0]['official_text_included'], 0)
+        self.assertIn('公式問題文', body['policy'])
 
     def test_review_queue_api(self):
         token = self._token()
