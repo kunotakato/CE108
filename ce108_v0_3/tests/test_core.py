@@ -14,6 +14,8 @@ from ce108.security import hash_password
 from ce108.seed import seed_database
 from scripts.export_question_review_csv import export_review_csv
 from scripts.export_first_paid_tester_pack import export_first_paid_pack
+from scripts.create_past_exam_theme_template import create_template
+from scripts.import_past_exam_theme_refs import import_refs
 from ce108.services import (
     answer_diagnostic,
     authenticate_user,
@@ -348,6 +350,28 @@ class TestCore(unittest.TestCase):
         listed = list_past_exam_theme_refs(topic_code='MED-ANAT', db_path=self.db)
         self.assertEqual(listed['themes'][0]['derived_theme'], '刺激伝導系')
         self.assertIn('公式問題文', listed['policy'])
+
+    def test_past_exam_theme_template_and_partial_import(self):
+        template = Path(self.t.name) / 'past_exam_template.csv'
+        create_template(template, start_round=38, end_round=39, latest_round=39, latest_year=2026, questions_per_session=2)
+        rows = template.read_text(encoding='utf-8-sig').splitlines()
+        self.assertEqual(len(rows), 9)
+        self.assertIn('38,2025,午前,1', rows[1])
+        self.assertIn('39,2026,午後,2', rows[-1])
+        partial = Path(self.t.name) / 'partial_refs.csv'
+        partial.write_text(
+            '\n'.join([
+                rows[0],
+                '39,2026,午前,1,MED-ANAT,刺激伝導系,"心臓,洞房結節",https://example.com,1,公式本文なし',
+                '39,2026,午前,2,,,,,,公式本文なし',
+            ]),
+            encoding='utf-8-sig',
+        )
+        count = import_refs(partial, self.db)
+        self.assertEqual(count, 1)
+        listed = list_past_exam_theme_refs(exam_round=39, db_path=self.db)
+        self.assertEqual(listed['total'], 1)
+        self.assertEqual(listed['items'][0]['exam_label'], '第39回 午前 第1問')
 
     def test_first_paid_tester_pack_csv_export(self):
         output = Path(self.t.name) / 'first_paid_tester_pack.csv'

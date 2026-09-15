@@ -32,7 +32,12 @@ def split_keywords(raw: str) -> list[str]:
     return [part.strip() for part in (raw or '').replace('、', ',').split(',') if part.strip()]
 
 
-def import_refs(input_path: Path, db_path: Path | str = DB_PATH) -> int:
+def row_is_incomplete(row: dict[str, str]) -> bool:
+    required = ('exam_round', 'exam_year', 'session', 'question_number', 'topic_code', 'derived_theme')
+    return any(not (row.get(key) or '').strip() for key in required)
+
+
+def import_refs(input_path: Path, db_path: Path | str = DB_PATH, skip_incomplete: bool = True) -> int:
     seed_database(db_path)
     count = 0
     with input_path.open('r', encoding='utf-8-sig', newline='') as f:
@@ -41,6 +46,8 @@ def import_refs(input_path: Path, db_path: Path | str = DB_PATH) -> int:
         if missing:
             raise ValueError(f"CSVの必須列が不足しています: {', '.join(missing)}")
         for row in reader:
+            if skip_incomplete and row_is_incomplete(row):
+                continue
             linked_question_id = row.get('linked_question_id') or None
             upsert_past_exam_theme_ref(
                 int(row['exam_round']),
@@ -63,8 +70,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description='Import metadata-only past-exam theme references.')
     parser.add_argument('input', help='CSV path with past-exam theme metadata.')
     parser.add_argument('--db-path', default=str(DB_PATH))
+    parser.add_argument('--strict', action='store_true', help='Fail instead of skipping incomplete template rows.')
     args = parser.parse_args()
-    count = import_refs(Path(args.input), Path(args.db_path))
+    count = import_refs(Path(args.input), Path(args.db_path), skip_incomplete=not args.strict)
     print(f'Imported {count} past-exam theme refs')
 
 

@@ -37,11 +37,47 @@ exam_round,exam_year,session,question_number,topic_code,derived_theme,keywords,s
 39,2026,午前,1,MED-ANAT,刺激伝導系,"心臓,洞房結節,房室結節",https://example.com,1,公式本文は保存しない
 ```
 
+## Create 10-Year Template
+
+第30回から第39回まで、午前90問・午後90問の記入用CSVを作成します。
+
+```bash
+cd /Users/taka.k/Documents/AIシステム/ce108_v0_3
+python scripts/create_past_exam_theme_template.py
+```
+
+出力先:
+
+```text
+data/past_exam_theme_refs_template_10y.csv
+```
+
+このCSVは10年分の枠だけを作ります。空欄のままにする列は以下です。
+
+- `topic_code`
+- `derived_theme`
+- `keywords`
+- `source_url`
+- `linked_question_id`
+
+過去問を確認しながら、本文ではなくテーマだけを入れます。
+
+```csv
+exam_round,exam_year,session,question_number,topic_code,derived_theme,keywords,source_url,linked_question_id,note
+39,2026,午前,1,MED-ANAT,刺激伝導系,"心臓,洞房結節,房室結節",https://example.com,1,公式本文・選択肢・解説文は保存しない
+```
+
 ## Import Command
 
 ```bash
 cd /Users/taka.k/Documents/AIシステム/ce108_v0_3
 python scripts/import_past_exam_theme_refs.py data/past_exam_theme_refs.csv
+```
+
+未入力行は自動でスキップされます。入力漏れをエラーにしたい場合は `--strict` を付けます。
+
+```bash
+python scripts/import_past_exam_theme_refs.py data/past_exam_theme_refs.csv --strict
 ```
 
 Render Shellで実行する場合も同じ考え方です。DBは環境変数 `CE108_DB_PATH` が指す `/var/data/ce108.db` を使います。
